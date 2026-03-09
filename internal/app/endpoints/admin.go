@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -133,9 +134,13 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 			return fmt.Errorf("invalid webapp init data: %w", err)
 		}
 
+		b, _ := io.ReadAll(r.Body)
+
+		log.Printf("new data: %s\n", string(b))
+
 		// 2. Парсим присланный JSON
 		var cfg service.YamlConfig
-		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+		if err := json.Unmarshal(b, &cfg); err != nil {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return fmt.Errorf("decode json error: %w", err)
 		}
