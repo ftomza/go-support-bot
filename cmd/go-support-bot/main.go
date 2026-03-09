@@ -83,7 +83,7 @@ func main() {
 		mux := http.NewServeMux()
 
 		// Регистрируем наши API ручки для WebApp
-		apiEps := endpoints.NewAPIEndpoints(svc, cfg.Telegram.Token)
+		apiEps := endpoints.NewAPIEndpoints(svc, clientBot.Bot, cfg.Telegram.DeveloperIDs)
 		apiEps.Register(mux)
 
 		// Устанавливаем вебхук в Telegram API
