@@ -18,11 +18,24 @@ import (
 )
 
 type YamlMessages struct {
-	WelcomeNewUser string `yaml:"WelcomeNewUser"`
-	AskForText     string `yaml:"AskForText"`
-	TopicCreated   string `yaml:"TopicCreated"`
-	OutOfHours     string `yaml:"OutOfHours"`
-	ServerError    string `yaml:"ServerError"`
+	WelcomeNewUser string `yaml:"WelcomeNewUser" json:"WelcomeNewUser"`
+	AskForText     string `yaml:"AskForText" json:"AskForText"`
+	TopicCreated   string `yaml:"TopicCreated" json:"TopicCreated"`
+	OutOfHours     string `yaml:"OutOfHours" json:"OutOfHours"`
+	ServerError    string `yaml:"ServerError" json:"ServerError"`
+}
+
+type YamlConfig struct {
+	Text     string               `yaml:"Text" json:"Text"`
+	Messages YamlMessages         `yaml:"Messages" json:"Messages"`
+	Themes   map[string]YamlTheme `yaml:"Themes" json:"Themes"`
+}
+
+type YamlTheme struct {
+	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
+	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
+	WorkHours *string              `yaml:"WorkHours,omitempty" json:"WorkHours,omitempty"`
+	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty" json:"SubTheme,omitempty"`
 }
 
 // Значения по умолчанию, чтобы бот не молчал, если YAML загрузили без блока Messages
@@ -34,19 +47,6 @@ func GetDefaultMessages() YamlMessages {
 		OutOfHours:     "🌙 <b>Внимание: нерабочее время</b>\nМенеджеры этой линии сейчас отдыхают. Ваше сообщение сохранено и будет обработано в рабочие часы (<b>%s</b>).",
 		ServerError:    "Ошибка сервера. Попробуйте позже.",
 	}
-}
-
-type YamlConfig struct {
-	Text     string               `yaml:"Text"`
-	Messages YamlMessages         `yaml:"Messages"`
-	Themes   map[string]YamlTheme `yaml:"Themes"`
-}
-
-type YamlTheme struct {
-	Text      string               `yaml:"Text,omitempty"`
-	Manager   *int64               `yaml:"Manager,omitempty"`
-	WorkHours *string              `yaml:"WorkHours,omitempty"`
-	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty"`
 }
 
 // ExportConfig собирает текущую конфигурацию в структуру для API

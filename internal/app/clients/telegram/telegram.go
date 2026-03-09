@@ -28,7 +28,10 @@ type roleCache struct {
 }
 
 func NewTelegramBot(token string) (*Client, error) {
-	bot, err := telego.NewBot(token, telego.WithDefaultDebugLogger())
+	bot, err := telego.NewBot(
+		token,
+		telego.WithDefaultDebugLogger(),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating telegram bot: %v", err)
 	}
