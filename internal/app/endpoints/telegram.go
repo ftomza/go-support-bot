@@ -1,0 +1,383 @@
+/*
+ * Copyright © 2026-present Artem V. Zaborskiy <ftomza@yandex.ru>. All rights reserved.
+ *
+ * This source code is licensed under the Apache 2.0 license found in the LICENSE file in the root directory of this source tree.
+ */
+
+package endpoints
+
+import (
+	"context"
+	"fmt"
+	"html"
+	"io"
+	"log"
+	"net/http"
+	"runtime/debug"
+	"strconv"
+	"strings"
+
+	"go-support-bot/internal/app/clients/telegram"
+	"go-support-bot/internal/app/service"
+
+	"github.com/mymmrac/telego"
+	th "github.com/mymmrac/telego/telegohandler"
+	tu "github.com/mymmrac/telego/telegoutil"
+)
+
+type TelegramEndpoints struct {
+	svc        *service.SupportService
+	devIDs     []int64
+	miniAppURL string
+}
+
+func NewTelegramEndpoints(svc *service.SupportService, devIDs []int64, miniAppURL string) *TelegramEndpoints {
+	return &TelegramEndpoints{
+		svc:        svc,
+		devIDs:     devIDs,
+		miniAppURL: miniAppURL,
+	}
+}
+
+// Предикат для загрузки CSV
+func isYamlUpload() th.Predicate {
+	return func(ctx context.Context, update telego.Update) bool {
+		return update.Message != nil && update.Message.Document != nil &&
+			update.Message.Caption == "/load_yaml"
+	}
+}
+
+// Метод для безопасной отправки ошибки разработчикам
+func (e *TelegramEndpoints) notifyDevelopers(bot *telego.Bot, text string) {
+	// Лимит сообщения в Telegram — 4096 символов. Если stack trace огромный, обрезаем его.
+	if len(text) > 4000 {
+		text = text[:4000] + "...</pre>"
+	}
+
+	for _, id := range e.devIDs {
+		_, _ = bot.SendMessage(context.Background(), &telego.SendMessageParams{
+			ChatID:    tu.ID(id),
+			Text:      text,
+			ParseMode: telego.ModeHTML,
+		})
+	}
+}
+
+func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
+	bh.Use(func(botCtx *th.Context, update telego.Update) error {
+		// 1. Defer для перехвата критических сбоев (panic)
+		defer func() {
+			if r := recover(); r != nil {
+				stack := string(debug.Stack())
+				log.Printf("PANIC RECOVERED: %v\n%s", r, stack)
+
+				errStr := fmt.Sprintf("🚨 <b>ПАНИКА В БОТЕ!</b>\n\n<b>Событие:</b> <code>%d</code>\n<b>Ошибка:</b> %v\n\n<pre>%s</pre>",
+					update.UpdateID, r, html.EscapeString(stack))
+
+				e.notifyDevelopers(botCtx.Bot(), errStr)
+			}
+		}()
+
+		// 2. Выполняем следующий хендлер, передавая ему и контекст, и апдейт
+		err := botCtx.Next(update)
+
+		// 3. Если хендлер вернул обычную ошибку (не панику), тоже шлем её разработчикам
+		if err != nil {
+			errStr := fmt.Sprintf("⚠️ <b>Ошибка обработки (Update %d):</b>\n<pre>%v</pre>",
+				update.UpdateID, html.EscapeString(err.Error()))
+			e.notifyDevelopers(botCtx.Bot(), errStr)
+		}
+
+		return err
+	})
+
+	// КОМАНДА ДЛЯ ОТКРЫТИЯ WEBAPP ПАНЕЛИ
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		// Пытаемся отправить WebApp-кнопку В ЛИЧКУ администратору (message.From.ID)
+		_, err := botCtx.Bot().SendMessage(ctx, &telego.SendMessageParams{
+			ChatID:    tu.ID(message.From.ID), // <--- ИЗМЕНЕНО: Шлем в личку, а не в message.Chat.ID
+			Text:      "⚙️ <b>Панель управления ботом</b>\nНажмите кнопку ниже, чтобы открыть визуальный редактор категорий и текстов.",
+			ParseMode: telego.ModeHTML,
+			ReplyMarkup: &telego.InlineKeyboardMarkup{
+				InlineKeyboard: [][]telego.InlineKeyboardButton{
+					{{
+						Text:   "🖥 Открыть редактор",
+						WebApp: &telego.WebAppInfo{URL: e.miniAppURL},
+					}},
+				},
+			},
+		})
+
+		// Если бот выдал ошибку (например, админ никогда раньше не писал боту в ЛС и чат не активирован)
+		if err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Не могу отправить панель. Пожалуйста, перейдите в личные сообщения со мной, нажмите /start, а затем снова введите /admin в этой группе.",
+			))
+			return nil
+		}
+
+		// (Опционально) можно удалить сообщение с командой /admin из группы, чтобы не мусорить
+		_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
+			ChatID:    tu.ID(message.Chat.ID),
+			MessageID: message.MessageID,
+		})
+
+		return nil
+	}, th.CommandEqual("admin"), telegram.IsGroupChat())
+
+	// 1. ЗАКРЫТИЕ ТОПИКА (Менеджер решил проблему)
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		err := e.svc.CloseTopic(ctx, message.MessageThreadID)
+		if err == nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"✅ Топик закрыт. Обращение клиента переведено в статус решенных.",
+			).WithReplyParameters(&telego.ReplyParameters{MessageID: message.MessageID}))
+		}
+		return err
+	}, telegram.IsGroupChat(), telegram.IsTopicClosed())
+
+	// 2. ЗАГРУЗКА CSV КОНФИГА
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		doc := message.Document
+
+		file, err := botCtx.Bot().GetFile(ctx, &telego.GetFileParams{FileID: doc.FileID})
+		if err != nil {
+			return err
+		}
+
+		// Скачиваем файл напрямую через Telegram API
+		fileURL := fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", botCtx.Bot().Token(), file.FilePath)
+		resp, err := http.Get(fileURL)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("failed to download file")
+		}
+		defer resp.Body.Close()
+
+		b, _ := io.ReadAll(resp.Body)
+
+		if err := e.svc.LoadCategoriesFromYAML(ctx, b); err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "❌ Ошибка парсинга YAML!"))
+			return err
+		}
+
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "✅ Темы и менеджеры успешно обновлены!"))
+		return nil
+	}, telegram.IsGroupChat(), isYamlUpload())
+
+	// 3. ТЕКСТ ОТ КЛИЕНТА
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		customerID := message.From.ID
+
+		// Проверяем, есть ли топик в базе
+		topic, err := e.svc.GetCustomerTopic(ctx, customerID)
+
+		// СЦЕНАРИЙ А: Топик ЕСТЬ и он ОТКРЫТ (просто пересылаем вопрос)
+		if err == nil && !topic.IsClosed {
+			return e.svc.HandleCustomerMessage(ctx, &message)
+		}
+
+		// СЦЕНАРИЙ Б: Топик ЕСТЬ, но он ЗАКРЫТ (клиент пишет новое обращение спустя время)
+		if err == nil && topic.IsClosed {
+			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+			prompt, _ := e.svc.GetMainPrompt(ctx)
+			if prompt == "" {
+				prompt = "С возвращением! Выберите тему вашего нового обращения:"
+			}
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				prompt,
+			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
+			return nil
+		}
+
+		// СЦЕНАРИЙ В: Топика НЕТ ВООБЩЕ (новичок)
+		session, exists := e.svc.GetSession(customerID)
+		msgs, _ := e.svc.GetMessages(ctx) // Получаем тексты
+
+		if !exists {
+			e.svc.SetWaitingName(customerID)
+			_, err := botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.WelcomeNewUser).WithParseMode(telego.ModeHTML))
+			return err
+		}
+
+		if session.WaitingName {
+			if message.Text == "" {
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.AskForText).WithParseMode(telego.ModeHTML))
+				return nil
+			}
+			e.svc.SaveName(customerID, message.Text)
+
+			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+			prompt, _ := e.svc.GetMainPrompt(ctx)
+
+			// Безопасно экранируем имя пользователя
+			safeName := html.EscapeString(message.Text)
+
+			var finalPrompt string
+			if prompt == "" {
+				finalPrompt = fmt.Sprintf("<b>%s</b>, выберите тему вашего обращения:", safeName)
+			} else {
+				// Склеиваем имя и HTML из базы
+				finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
+			}
+
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				finalPrompt,
+			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML)) // <--- Добавили ParseMode
+			return nil
+		}
+
+		return nil
+	}, telegram.IsPrivateChat(), e.svc.IsCustomer())
+
+	// 4. НАЖАТИЕ НА КНОПКУ ТЕМЫ (CallbackQuery)
+	bh.HandleCallbackQuery(func(botCtx *th.Context, query telego.CallbackQuery) error {
+		ctx := botCtx.Context()
+		customerID := query.From.ID
+
+		_ = botCtx.Bot().AnswerCallbackQuery(ctx, &telego.AnswerCallbackQueryParams{CallbackQueryID: query.ID})
+
+		// Кнопка "В начало"
+		if query.Data == "cat_root" {
+			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+			prompt, _ := e.svc.GetMainPrompt(ctx)
+			if prompt == "" {
+				prompt = "Выберите тему обращения:"
+			}
+			_, _ = botCtx.Bot().EditMessageText(ctx, &telego.EditMessageTextParams{
+				ChatID:      tu.ID(customerID),
+				MessageID:   query.Message.GetMessageID(),
+				Text:        prompt,
+				ReplyMarkup: kb,
+				ParseMode:   telego.ModeHTML,
+			})
+			return nil
+		}
+
+		if !strings.HasPrefix(query.Data, "cat_") {
+			return nil
+		}
+
+		categoryID, _ := strconv.Atoi(strings.TrimPrefix(query.Data, "cat_"))
+		category, err := e.svc.GetCategoryByID(ctx, categoryID) // Убедись, что добавил этот метод
+		if err != nil {
+			return nil
+		}
+
+		// Сценарий А: Это ПАПКА (промежуточная тема)
+		if category.ManagerID == nil {
+			kb, _ := e.svc.GetCategoriesKeyboard(ctx, &category.ID)
+			prompt := category.PromptText
+			if prompt == "" {
+				prompt = "Выберите подтему:"
+			}
+
+			_, _ = botCtx.Bot().EditMessageText(ctx, &telego.EditMessageTextParams{
+				ChatID:      tu.ID(customerID),
+				MessageID:   query.Message.GetMessageID(),
+				Text:        prompt,
+				ParseMode:   telego.ModeHTML,
+				ReplyMarkup: kb,
+			})
+			return nil
+		}
+
+		// Сценарий Б: Это ФИНАЛЬНАЯ ТЕМА (лист) с назначенным менеджером
+		session, exists := e.svc.GetSession(customerID)
+		fullName := query.From.FirstName
+		if exists && session.FullName != "" {
+			fullName = session.FullName
+		}
+
+		msgs, _ := e.svc.GetMessages(ctx)
+		err = e.svc.CreateOrReopenTopic(ctx, customerID, query.From.Username, fullName, categoryID, query.From.LanguageCode)
+		if err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.ServerError).WithParseMode(telego.ModeHTML))
+			return nil
+		}
+
+		e.svc.ClearSession(customerID)
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.TopicCreated).WithParseMode(telego.ModeHTML))
+
+		_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
+			ChatID:    tu.ID(customerID),
+			MessageID: query.Message.GetMessageID(),
+		})
+		return nil
+	}, e.svc.IsCustomer())
+
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		list, err := e.svc.GetManagersList(ctx)
+		if err != nil {
+			log.Printf("Error getting managers list: %v", err)
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Ошибка при получении списка менеджеров.",
+			))
+			return nil
+		}
+
+		_, err = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			list,
+		).WithParseMode(telego.ModeHTML))
+		return err
+	}, th.CommandEqual("managers"), telegram.IsGroupChat())
+
+	// Команда /clearcache ТОЛЬКО для группы поддержки
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		e.svc.ClearCacheBotClient()
+
+		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			"🔄 Кэш ролей пользователей успешно сброшен!",
+		))
+		return err
+	}, th.CommandEqual("clearcache"), telegram.IsGroupChat())
+
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		yamlData, err := e.svc.ExportCategoriesToYAML(ctx)
+		if err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "❌ Ошибка выгрузки конфигурации."))
+			return err
+		}
+
+		document := tu.Document(
+			tu.ID(message.Chat.ID),
+			tu.FileFromBytes(yamlData, "theme.yaml"),
+		).WithCaption("⚙️ Текущая конфигурация бота. Отредактируйте и отправьте обратно с подписью /load_yaml")
+
+		_, err = botCtx.Bot().SendDocument(ctx, document)
+		return err
+	}, th.CommandEqual("get_yaml"), telegram.IsGroupChat())
+
+	// 5. ОТВЕТЫ ОТ МЕНЕДЖЕРОВ В ТОПИКАХ (Пересылка клиенту)
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		// Защита: не пересылаем команды (например, /managers или /clearcache) клиенту,
+		// если менеджер случайно написал их внутри топика клиента
+		if strings.HasPrefix(message.Text, "/") || strings.HasPrefix(message.Caption, "/") {
+			return nil
+		}
+
+		// Вызываем бизнес-логику пересылки
+		if err := e.svc.HandleManagerMessage(ctx, &message); err != nil {
+			log.Printf("Error handling manager message: %v", err)
+		}
+		return nil
+	}, telegram.IsGroupChat())
+}

@@ -1,0 +1,20 @@
+env: "local" # local, dev, prod
+
+telegram:
+  token: "example_token"
+  support_group_id: -100XXXXXX
+  use_webhooks: true
+  developer_ids: [XXXXXXXX]
+  webhook_url: "https://example.org/hook"
+  mini_app_url: "https://example.org/admin"
+
+database:
+  url: "postgres://user:password@localhost:5432/support_bot_db?sslmode=disable"
+
+server:
+  port: "8081"
+
+llm:
+  enable_translate: true
+  gemini_api_key: "example_token" # Получить можно в Google AI Studio
+  manager_lang: "en" # Базовый язык менеджеров

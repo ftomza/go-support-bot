@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: support_bot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: support_bot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migration/20260304161501_init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: support_bot_app
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      - db
+    volumes:
+      - ./config/prod.yaml:/app/config/prod.yaml
+      - ./certs:/app/certs
+    environment:
+      - CONFIG_PATH=config/prod.yaml
+      - TZ=Asia/Dubai
+
+volumes:
+  pgdata:
