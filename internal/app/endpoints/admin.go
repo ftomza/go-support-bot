@@ -134,18 +134,22 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 			return fmt.Errorf("invalid webapp init data: %w", err)
 		}
 
-		b, _ := io.ReadAll(r.Body)
+		// 2. Читаем сырой JSON от фронтенда и логгируем его
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return fmt.Errorf("read body error: %w", err)
+		}
 
-		log.Printf("new data: %s\n", string(b))
+		log.Printf("📥 RAW JSON FROM FRONTEND: %s", string(bodyBytes))
 
-		// 2. Парсим присланный JSON
 		var cfg service.YamlConfig
-		if err := json.Unmarshal(b, &cfg); err != nil {
+		if err := json.Unmarshal(bodyBytes, &cfg); err != nil {
 			http.Error(w, "Bad Request", http.StatusBadRequest)
 			return fmt.Errorf("decode json error: %w", err)
 		}
 
-		log.Printf("new config: %+v\n", cfg)
+		log.Printf("📦 PARSED CONFIG: %+v", cfg)
 
 		// 3. Сохраняем в БД
 		if err := api.svc.ImportConfig(r.Context(), &cfg); err != nil {

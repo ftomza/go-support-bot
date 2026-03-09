@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock } from 'lucide-react';
 
 const tg = window.Telegram?.WebApp;
@@ -114,9 +114,14 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
 
 export default function App() {
     const [config, setConfig] = useState(null);
+    const configRef = useRef(null);
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('themes');
+
+    useEffect(() => {
+        configRef.current = config;
+    }, [config]);
 
     useEffect(() => {
         if (tg) {
@@ -155,6 +160,9 @@ export default function App() {
     };
 
     const saveConfig = async () => {
+        const currentConfig = configRef.current; // <--- БЕРЕМ СВЕЖИЕ ДАННЫЕ ИЗ REF!
+        if (!currentConfig) return;
+
         tg?.MainButton.showProgress();
         try {
             const res = await fetch('/api/config/save', {
@@ -163,7 +171,7 @@ export default function App() {
                     'Content-Type': 'application/json',
                     'X-Telegram-Init-Data': tg?.initData || ''
                 },
-                body: JSON.stringify(config)
+                body: JSON.stringify(currentConfig) // <--- ШЛЕМ СВЕЖИЕ ДАННЫЕ
             });
             if (!res.ok) throw new Error('Ошибка сервера');
             tg?.showAlert('Успешно сохранено!');
