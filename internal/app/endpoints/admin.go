@@ -140,6 +140,8 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 			return fmt.Errorf("decode json error: %w", err)
 		}
 
+		log.Printf("new config: %+v\n", cfg)
+
 		// 3. Сохраняем в БД
 		if err := api.svc.ImportConfig(r.Context(), &cfg); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
