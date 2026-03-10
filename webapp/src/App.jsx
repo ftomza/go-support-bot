@@ -3,26 +3,18 @@ import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock
 
 const tg = window.Telegram?.WebApp;
 
-// Рекурсивный компонент для отрисовки папок и тем
 const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers }) => {
     const [expanded, setExpanded] = useState(false);
     const isLeaf = !node.SubTheme || Object.keys(node.SubTheme).length === 0;
 
-    // Логика для тайм-пикера (разбиваем "09:00-18:00" на start и end)
     const hours = node.WorkHours || '';
     const [startTime = '', endTime = ''] = hours.split('-');
 
     const handleTimeChange = (type, val) => {
         let newStart = type === 'start' ? val : startTime;
         let newEnd = type === 'end' ? val : endTime;
-
-        // Если оба пустые - очищаем график (24/7)
-        if (!newStart && !newEnd) {
-            onChange(path, 'WorkHours', '');
-        } else {
-            // Если заполнили только один, второй ставим по умолчанию
-            onChange(path, 'WorkHours', `${newStart || '00:00'}-${newEnd || '23:59'}`);
-        }
+        if (!newStart && !newEnd) onChange(path, 'WorkHours', '');
+        else onChange(path, 'WorkHours', `${newStart || '00:00'}-${newEnd || '23:59'}`);
     };
 
     return (
@@ -44,7 +36,6 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
                     </div>
                 </div>
 
-                {/* Настройки текущей темы */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 text-sm">
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-tg-hint font-semibold">Сообщение при выборе (HTML)</label>
@@ -55,7 +46,6 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
                             className="w-full bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link"
                         />
                     </div>
-
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-tg-hint font-semibold">Менеджер</label>
                         <select
@@ -71,39 +61,25 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
                             ))}
                         </select>
                     </div>
-
                     <div className="flex flex-col gap-1 md:col-span-2">
                         <label className="text-xs text-tg-hint font-semibold flex items-center gap-1">
-                            <Clock size={12}/> Часы работы (оставьте пустым для 24/7)
+                            <Clock size={12}/> Часы работы (пусто = 24/7)
                         </label>
                         <div className="flex items-center gap-2">
-                            <input
-                                type="time"
-                                value={startTime}
-                                onChange={(e) => handleTimeChange('start', e.target.value)}
-                                className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1"
-                            />
+                            <input type="time" value={startTime} onChange={(e) => handleTimeChange('start', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1" />
                             <span className="text-tg-hint">—</span>
-                            <input
-                                type="time"
-                                value={endTime}
-                                onChange={(e) => handleTimeChange('end', e.target.value)}
-                                className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1"
-                            />
+                            <input type="time" value={endTime} onChange={(e) => handleTimeChange('end', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1" />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Рендерим дочерние элементы */}
             {expanded && node.SubTheme && (
                 <div className="mt-2">
                     {Object.entries(node.SubTheme).map(([childName, childNode]) => (
                         <ThemeNode
-                            key={childName} name={childName} node={childNode}
-                            path={[...path, childName]}
-                            onChange={onChange} onDelete={onDelete} onAddSub={onAddSub}
-                            managers={managers}
+                            key={childName} name={childName} node={childNode} path={[...path, childName]}
+                            onChange={onChange} onDelete={onDelete} onAddSub={onAddSub} managers={managers}
                         />
                     ))}
                 </div>
@@ -114,10 +90,13 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
 
 export default function App() {
     const [config, setConfig] = useState(null);
-    const configRef = useRef(null);
+    const configRef = useRef(null); // Синхронизация данных для сохранения
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('themes');
+
+    // Состояние для кастомного модального окна добавления темы
+    const [promptModal, setPromptModal] = useState({ isOpen: false, path: null, value: '' });
 
     useEffect(() => {
         configRef.current = config;
@@ -139,17 +118,10 @@ export default function App() {
 
     const fetchData = async () => {
         try {
-            // Параллельно загружаем конфиг и список менеджеров
-            const [configRes, managersRes] = await Promise.all([
-                fetch('/api/config/get'),
-                fetch('/api/managers')
-            ]);
-
+            const [configRes, managersRes] = await Promise.all([ fetch('/api/config/get'), fetch('/api/managers') ]);
             const configData = await configRes.json();
             const managersData = await managersRes.json();
-
             if (!configData.Themes) configData.Themes = {};
-
             setConfig(configData);
             setManagers(managersData || []);
         } catch (err) {
@@ -160,7 +132,7 @@ export default function App() {
     };
 
     const saveConfig = async () => {
-        const currentConfig = configRef.current; // <--- БЕРЕМ СВЕЖИЕ ДАННЫЕ ИЗ REF!
+        const currentConfig = configRef.current;
         if (!currentConfig) return;
 
         tg?.MainButton.showProgress();
@@ -171,7 +143,7 @@ export default function App() {
                     'Content-Type': 'application/json',
                     'X-Telegram-Init-Data': tg?.initData || ''
                 },
-                body: JSON.stringify(currentConfig) // <--- ШЛЕМ СВЕЖИЕ ДАННЫЕ
+                body: JSON.stringify(currentConfig)
             });
             if (!res.ok) throw new Error('Ошибка сервера');
             tg?.showAlert('Успешно сохранено!');
@@ -186,13 +158,8 @@ export default function App() {
         setConfig(prev => {
             const newConfig = JSON.parse(JSON.stringify(prev));
             let current = newConfig.Themes;
-
-            for (let i = 0; i < path.length - 1; i++) {
-                current = current[path[i]].SubTheme;
-            }
-
+            for (let i = 0; i < path.length - 1; i++) current = current[path[i]].SubTheme;
             const targetName = path[path.length - 1];
-
             if (field === 'rename') {
                 if (value && value !== oldName) {
                     current[value] = current[oldName];
@@ -201,13 +168,26 @@ export default function App() {
             } else {
                 current[targetName][field] = value;
             }
-
             return newConfig;
         });
     };
 
-    const deleteNode = (path, name) => {
-        if (!window.confirm(`Удалить тему "${name}"?`)) return;
+    // БЕЗОПАСНОЕ УДАЛЕНИЕ С ИСПОЛЬЗОВАНИЕМ НАТИВНОГО POPUP
+    const requestDelete = (path, name) => {
+        if (tg && tg.showPopup) {
+            tg.showPopup({
+                title: 'Удаление',
+                message: `Удалить тему "${name}"?`,
+                buttons: [{ id: 'delete', type: 'destructive', text: 'Удалить' }, { type: 'cancel' }]
+            }, (btnId) => {
+                if (btnId === 'delete') performDelete(path);
+            });
+        } else {
+            if (window.confirm(`Удалить тему "${name}"?`)) performDelete(path);
+        }
+    };
+
+    const performDelete = (path) => {
         setConfig(prev => {
             const newConfig = JSON.parse(JSON.stringify(prev));
             let current = newConfig.Themes;
@@ -217,9 +197,20 @@ export default function App() {
         });
     };
 
-    const addSubNode = (path) => {
-        const newName = prompt('Введите название новой подтемы:');
-        if (!newName) return;
+    // БЕЗОПАСНОЕ ДОБАВЛЕНИЕ ЧЕРЕЗ REACT-МОДАЛКУ
+    const openAddModal = (path) => {
+        setPromptModal({ isOpen: true, path, value: '' });
+    };
+
+    const submitAddModal = () => {
+        const { path, value } = promptModal;
+        const newName = value.trim();
+
+        if (!newName) {
+            setPromptModal({ isOpen: false, path: null, value: '' });
+            return;
+        }
+
         setConfig(prev => {
             const newConfig = JSON.parse(JSON.stringify(prev));
             let current = path.length === 0 ? newConfig.Themes : newConfig.Themes;
@@ -238,12 +229,46 @@ export default function App() {
             current[newName] = { Text: '', Manager: null, WorkHours: '' };
             return newConfig;
         });
+
+        setPromptModal({ isOpen: false, path: null, value: '' });
     };
 
     if (loading) return <div className="p-5 text-center text-tg-hint">Загрузка интерфейса...</div>;
 
     return (
-        <div className="pb-24">
+        <div className="pb-24 relative">
+            {/* Кастомное модальное окно */}
+            {promptModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                    <div className="bg-tg-bg w-full max-w-sm rounded-2xl p-5 shadow-xl border border-tg-hint/20">
+                        <h3 className="text-lg font-bold mb-3 text-tg-text">Название новой темы</h3>
+                        <input
+                            autoFocus
+                            type="text"
+                            value={promptModal.value}
+                            onChange={e => setPromptModal(prev => ({ ...prev, value: e.target.value }))}
+                            placeholder="Введите название..."
+                            className="w-full bg-tg-secondaryBg border border-tg-hint/30 rounded-xl p-3 mb-5 outline-none focus:border-tg-link text-tg-text transition-colors"
+                            onKeyDown={e => e.key === 'Enter' && submitAddModal()}
+                        />
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setPromptModal({ isOpen: false, path: null, value: '' })}
+                                className="px-4 py-2.5 text-tg-hint font-medium hover:bg-tg-secondaryBg rounded-xl transition-colors"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={submitAddModal}
+                                className="px-4 py-2.5 bg-tg-button text-tg-buttonText font-bold rounded-xl shadow-sm transition-opacity hover:opacity-90"
+                            >
+                                Добавить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Tabs */}
             <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10">
                 <button
@@ -265,14 +290,14 @@ export default function App() {
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold">Дерево категорий</h2>
-                            <button onClick={() => addSubNode([])} className="bg-tg-button text-tg-buttonText px-3 py-1.5 rounded flex items-center gap-1 text-sm shadow">
-                                <Plus size={16}/> Добавить корень
+                            <button onClick={() => openAddModal([])} className="bg-tg-button text-tg-buttonText px-3 py-1.5 rounded-lg flex items-center gap-1 text-sm shadow">
+                                <Plus size={16}/> Корень
                             </button>
                         </div>
                         {Object.entries(config.Themes).map(([name, node]) => (
                             <ThemeNode
                                 key={name} name={name} node={node} path={[name]}
-                                onChange={updateTree} onDelete={deleteNode} onAddSub={addSubNode}
+                                onChange={updateTree} onDelete={requestDelete} onAddSub={openAddModal}
                                 managers={managers}
                             />
                         ))}
@@ -303,7 +328,7 @@ export default function App() {
                                             return next;
                                         });
                                     }}
-                                    className="w-full bg-tg-secondaryBg border border-transparent rounded p-2 min-h-[80px] outline-none focus:border-tg-link transition-colors"
+                                    className="w-full bg-tg-secondaryBg border border-transparent rounded-xl p-3 min-h-[80px] outline-none focus:border-tg-link transition-colors"
                                 />
                             </div>
                         ))}
@@ -314,7 +339,7 @@ export default function App() {
             {!tg?.initData && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-tg-bg border-t border-tg-hint/30">
                     <button onClick={saveConfig} className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow-lg">
-                        Сохранить конфигурацию (Dev)
+                        Сохранить (Dev)
                     </button>
                 </div>
             )}
