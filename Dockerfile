@@ -31,7 +31,6 @@ FROM alpine:latest
 WORKDIR /app
 # Копируем только сам бинарник, миграции и конфиг
 COPY --from=backend-builder /app/bin/bot ./bot
-COPY migration/ ./migration/
 COPY config/prod.yaml ./config/prod.yaml
 
 # Указываем путь к конфигу

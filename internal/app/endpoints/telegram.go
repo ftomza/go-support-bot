@@ -128,6 +128,82 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		return nil
 	}, th.CommandEqual("admin"), telegram.IsGroupChat())
 
+	// КОМАНДА ДЛЯ ПЕРЕКЛЮЧЕНИЯ РЕЖИМА КЛИЕНТА (ТОЛЬКО ДЛЯ АДМИНОВ)
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		userID := message.From.ID
+
+		// Проверяем, что юзер действительно является менеджером группы
+		if !e.svc.IsManager(ctx, userID) {
+			return nil
+		}
+
+		// Переключаем режим туда-обратно
+		isEnabled := e.svc.ToggleTestMode(userID)
+
+		msg := "👨‍💻 <b>Режим клиента ВЫКЛЮЧЕН</b>\nТеперь вы снова админ. Чтобы протестировать меню, включите режим обратно."
+		if isEnabled {
+			msg = "👤 <b>Режим клиента ВКЛЮЧЕН</b>\n\nТеперь бот будет общаться с вами так же, как с обычным пользователем.\n<i>(Напишите любое текстовое сообщение, чтобы вызвать меню)</i>"
+		}
+
+		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(userID),
+			msg,
+		).WithParseMode(telego.ModeHTML))
+
+		return err
+	}, th.CommandEqual("client_mode"), telegram.IsPrivateChat())
+
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		list, err := e.svc.GetManagersList(ctx)
+		if err != nil {
+			log.Printf("Error getting managers list: %v", err)
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Ошибка при получении списка менеджеров.",
+			))
+			return nil
+		}
+
+		_, err = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			list,
+		).WithParseMode(telego.ModeHTML))
+		return err
+	}, th.CommandEqual("managers"), telegram.IsGroupChat())
+
+	// Команда /clearcache ТОЛЬКО для группы поддержки
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		e.svc.ClearCacheBotClient()
+
+		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			"🔄 Кэш ролей пользователей успешно сброшен!",
+		))
+		return err
+	}, th.CommandEqual("clearcache"), telegram.IsGroupChat())
+
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		yamlData, err := e.svc.ExportCategoriesToYAML(ctx)
+		if err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "❌ Ошибка выгрузки конфигурации."))
+			return err
+		}
+
+		document := tu.Document(
+			tu.ID(message.Chat.ID),
+			tu.FileFromBytes(yamlData, "theme.yaml"),
+		).WithCaption("⚙️ Текущая конфигурация бота. Отредактируйте и отправьте обратно с подписью /load_yaml")
+
+		_, err = botCtx.Bot().SendDocument(ctx, document)
+		return err
+	}, th.CommandEqual("get_yaml"), telegram.IsGroupChat())
+
 	// 1. ЗАКРЫТИЕ ТОПИКА (Менеджер решил проблему)
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
 		ctx := botCtx.Context()
@@ -169,76 +245,6 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "✅ Темы и менеджеры успешно обновлены!"))
 		return nil
 	}, telegram.IsGroupChat(), isYamlUpload())
-
-	// 3. ТЕКСТ ОТ КЛИЕНТА
-	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
-		ctx := botCtx.Context()
-		customerID := message.From.ID
-
-		// Проверяем, есть ли топик в базе
-		topic, err := e.svc.GetCustomerTopic(ctx, customerID)
-
-		// СЦЕНАРИЙ А: Топик ЕСТЬ и он ОТКРЫТ (просто пересылаем вопрос)
-		if err == nil && !topic.IsClosed {
-			return e.svc.HandleCustomerMessage(ctx, &message)
-		}
-
-		// СЦЕНАРИЙ Б: Топик ЕСТЬ, но он ЗАКРЫТ (клиент пишет новое обращение спустя время)
-		if err == nil && topic.IsClosed {
-			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
-			prompt, _ := e.svc.GetMainPrompt(ctx)
-			if prompt == "" {
-				prompt = "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:"
-			}
-			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
-				tu.ID(message.Chat.ID),
-				prompt,
-			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
-			return nil
-		}
-
-		// СЦЕНАРИЙ В: Топика НЕТ ВООБЩЕ (новичок)
-		session, exists := e.svc.GetSession(customerID)
-		msgs, _ := e.svc.GetMessages(ctx) // Получаем тексты
-
-		if !exists {
-			e.svc.SetWaitingName(customerID)
-			_, err := botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.WelcomeNewUser).WithParseMode(telego.ModeHTML))
-			return err
-		}
-
-		// Если мы ждали имя — сохраняем его
-		if session.WaitingName {
-			if message.Text == "" {
-				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.AskForText).WithParseMode(telego.ModeHTML))
-				return nil
-			}
-			e.svc.SaveName(customerID, message.Text)
-			// Обновляем локальную переменную, чтобы сразу выдать меню ниже
-			session.FullName = message.Text
-		}
-
-		// СЦЕНАРИЙ Г: Имя введено, но топика нет (клиент пишет текст вместо нажатия на кнопку)
-		kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
-		prompt, _ := e.svc.GetMainPrompt(ctx)
-
-		// Безопасно экранируем имя пользователя
-		safeName := html.EscapeString(session.FullName)
-
-		var finalPrompt string
-		if prompt == "" {
-			finalPrompt = fmt.Sprintf("<b>%s</b>, пожалуйста, воспользуйтесь кнопками меню ниже для выбора темы:", safeName)
-		} else {
-			finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
-		}
-
-		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
-			tu.ID(message.Chat.ID),
-			finalPrompt,
-		).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
-
-		return nil
-	}, telegram.IsPrivateChat(), e.svc.IsCustomer())
 
 	// 4. НАЖАТИЕ НА КНОПКУ ТЕМЫ (CallbackQuery)
 	bh.HandleCallbackQuery(func(botCtx *th.Context, query telego.CallbackQuery) error {
@@ -316,55 +322,75 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		return nil
 	}, e.svc.IsCustomer())
 
+	// 3. ТЕКСТ ОТ КЛИЕНТА
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
 		ctx := botCtx.Context()
+		customerID := message.From.ID
 
-		list, err := e.svc.GetManagersList(ctx)
-		if err != nil {
-			log.Printf("Error getting managers list: %v", err)
+		// Проверяем, есть ли топик в базе
+		topic, err := e.svc.GetCustomerTopic(ctx, customerID)
+
+		// СЦЕНАРИЙ А: Топик ЕСТЬ и он ОТКРЫТ (просто пересылаем вопрос)
+		if err == nil && !topic.IsClosed {
+			return e.svc.HandleCustomerMessage(ctx, &message)
+		}
+
+		// СЦЕНАРИЙ Б: Топик ЕСТЬ, но он ЗАКРЫТ (клиент пишет новое обращение спустя время)
+		if err == nil && topic.IsClosed {
+			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+			prompt, _ := e.svc.GetMainPrompt(ctx)
+			if prompt == "" {
+				prompt = "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:"
+			}
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				"❌ Ошибка при получении списка менеджеров.",
-			))
+				prompt,
+			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
 			return nil
 		}
 
-		_, err = botCtx.Bot().SendMessage(ctx, tu.Message(
-			tu.ID(message.Chat.ID),
-			list,
-		).WithParseMode(telego.ModeHTML))
-		return err
-	}, th.CommandEqual("managers"), telegram.IsGroupChat())
+		// СЦЕНАРИЙ В: Топика НЕТ ВООБЩЕ (новичок)
+		session, exists := e.svc.GetSession(customerID)
+		msgs, _ := e.svc.GetMessages(ctx) // Получаем тексты
 
-	// Команда /clearcache ТОЛЬКО для группы поддержки
-	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
-		ctx := botCtx.Context()
-		e.svc.ClearCacheBotClient()
-
-		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
-			tu.ID(message.Chat.ID),
-			"🔄 Кэш ролей пользователей успешно сброшен!",
-		))
-		return err
-	}, th.CommandEqual("clearcache"), telegram.IsGroupChat())
-
-	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
-		ctx := botCtx.Context()
-
-		yamlData, err := e.svc.ExportCategoriesToYAML(ctx)
-		if err != nil {
-			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), "❌ Ошибка выгрузки конфигурации."))
+		if !exists {
+			e.svc.SetWaitingName(customerID)
+			_, err := botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.WelcomeNewUser).WithParseMode(telego.ModeHTML))
 			return err
 		}
 
-		document := tu.Document(
-			tu.ID(message.Chat.ID),
-			tu.FileFromBytes(yamlData, "theme.yaml"),
-		).WithCaption("⚙️ Текущая конфигурация бота. Отредактируйте и отправьте обратно с подписью /load_yaml")
+		// Если мы ждали имя — сохраняем его
+		if session.WaitingName {
+			if message.Text == "" {
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.AskForText).WithParseMode(telego.ModeHTML))
+				return nil
+			}
+			e.svc.SaveName(customerID, message.Text)
+			// Обновляем локальную переменную, чтобы сразу выдать меню ниже
+			session.FullName = message.Text
+		}
 
-		_, err = botCtx.Bot().SendDocument(ctx, document)
-		return err
-	}, th.CommandEqual("get_yaml"), telegram.IsGroupChat())
+		// СЦЕНАРИЙ Г: Имя введено, но топика нет (клиент пишет текст вместо нажатия на кнопку)
+		kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+		prompt, _ := e.svc.GetMainPrompt(ctx)
+
+		// Безопасно экранируем имя пользователя
+		safeName := html.EscapeString(session.FullName)
+
+		var finalPrompt string
+		if prompt == "" {
+			finalPrompt = fmt.Sprintf("<b>%s</b>, пожалуйста, воспользуйтесь кнопками меню ниже для выбора темы:", safeName)
+		} else {
+			finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
+		}
+
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			finalPrompt,
+		).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
+
+		return nil
+	}, telegram.IsPrivateChat(), e.svc.IsCustomer())
 
 	// 5. ОТВЕТЫ ОТ МЕНЕДЖЕРОВ В ТОПИКАХ (Пересылка клиенту)
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
@@ -383,29 +409,4 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		return nil
 	}, telegram.IsGroupChat())
 
-	// КОМАНДА ДЛЯ ПЕРЕКЛЮЧЕНИЯ РЕЖИМА КЛИЕНТА (ТОЛЬКО ДЛЯ АДМИНОВ)
-	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
-		ctx := botCtx.Context()
-		userID := message.From.ID
-
-		// Проверяем, что юзер действительно является менеджером группы
-		if !e.svc.IsManager(ctx, userID) {
-			return nil
-		}
-
-		// Переключаем режим туда-обратно
-		isEnabled := e.svc.ToggleTestMode(userID)
-
-		msg := "👨‍💻 <b>Режим клиента ВЫКЛЮЧЕН</b>\nТеперь вы снова админ. Чтобы протестировать меню, включите режим обратно."
-		if isEnabled {
-			msg = "👤 <b>Режим клиента ВКЛЮЧЕН</b>\n\nТеперь бот будет общаться с вами так же, как с обычным пользователем.\n<i>(Напишите любое текстовое сообщение, чтобы вызвать меню)</i>"
-		}
-
-		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
-			tu.ID(userID),
-			msg,
-		).WithParseMode(telego.ModeHTML))
-
-		return err
-	}, th.CommandEqual("client_mode"), telegram.IsPrivateChat())
 }
