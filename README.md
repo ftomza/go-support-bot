@@ -1,112 +1,132 @@
-# go-support-bot
+# 🤖 Enterprise Telegram Support Bot
 
-[![Go-доклад](https://img.shields.io/badge/go--report-A+-blue.svg)](https://goreportcard.com/report/github.com/ftomza/go-support-bot)
-[![Лицензия](https://img.shields.io/badge/license-Apache-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Go-report](https://img.shields.io/badge/go--report-A+-blue.svg)](https://goreportcard.com/report/github.com/ftomza/go-support-bot)
+[![License](https://img.shields.io/badge/license-Apache-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 
-Телеграм-бот для поддержки клиентов, написанный на Go. Этот бот служит примером создания надежного и удобного в сопровождении бота с использованием современных практик Go.
+Современный, производительный и многоязычный бот технической поддержки для Telegram. Построен на **Go** с использованием чистого API, оснащен встроенной **React WebApp** панелью управления и интегрирован с **Google Gemini AI** для бесшовного перевода сообщений между клиентами и менеджерами.
 
-## Особенности
+## ✨ Ключевые возможности
 
-- **Многоязычная поддержка:** Автоматический перевод сообщений между клиентами и менеджерами с помощью Gemini API.
-- **Поддержка тем:** Каждый новый диалог с клиентом создает отдельную тему в группе поддержки.
-- **Гибкая конфигурация:** Настройка с помощью YAML-файла, переменных окружения или флагов командной строки.
-- **Поддержка веб-хуков и лонг-поллинга:** Выбор режима работы в зависимости от ваших потребностей.
-- **Уведомления о нерабочем времени:** Автоматические ответы клиентам в нерабочее время.
-- **Разделение ролей:** Четкое различие между клиентами и менеджерами.
+* **🌐 Бесшовный AI Переводчик (Gemini 2.5 Flash):** Бот автоматически определяет язык клиента. Если клиент пишет на испанском, а менеджер говорит по-русски, бот переводит сообщения "на лету" в обе стороны.
+* **🖥️ WebApp Панель Администратора:** Полноценный визуальный редактор прямо внутри Telegram (React + Tailwind CSS). Позволяет настраивать дерево категорий, назначать менеджеров и менять системные тексты без редактирования кода.
+* **🕒 Умный график работы:** Настройка рабочих часов (например, `09:00-18:00`) для каждой категории отдельно. При обращении в нерабочее время клиент получает вежливую отбивку.
+* **📦 Автоматические миграции (Goose):** База данных обновляется автоматически при запуске приложения. SQL-миграции "запекаются" в бинарный файл с помощью `go:embed`.
+* **🛡️ Защита от сбоев (Panic Recovery):** Критические ошибки не "убивают" бота. Перехватчик шлет `stack trace` разработчикам в личку и продолжает работу.
+* **⚡ Webhooks & SSL:** Готов к высоким нагрузкам. Поддерживает работу через webhook по HTTPS (с использованием собственных сертификатов, например, Cloudflare Origin CA).
+* **👨‍💻 Режим тестирования:** Команда `/client_mode` позволяет администраторам тестировать клиентскую воронку и меню, не теряя при этом прав менеджера в группе.
 
-## Архитектура
+## 🛠 Технологический стек
 
-Проект имеет четкую структуру с разделением ответственности:
+* **Backend:** Go (Golang) 1.25+, `telego` (Telegram Bot API), `net/http`
+* **Frontend (Admin Panel):** React, Vite, Tailwind CSS, Telegram WebApp API
+* **Database:** PostgreSQL, `pgx` (driver), `goose` (migrations)
+* **AI Integration:** Google Generative AI SDK (Gemini)
+* **Deployment:** Docker, Docker Compose, GitHub Actions (CI/CD)
 
-- `cmd/go-support-bot`: Точка входа в приложение.
-- `internal/app`: Основная логика приложения.
-  - `clients`: Внешние клиенты (Telegram, Gemini).
-  - `config`: Обработка конфигурации.
-  - `datastruct`: Структуры данных приложения.
-  - `endpoints`: Обработчики эндпоинтов Telegram.
-  - `repository`: Взаимодействие с базой данных.
-  - `service`: Бизнес-логика.
-- `config`: Файлы конфигурации.
-- `migrations`: Миграции базы данных.
+## 📁 Структура проекта
 
-## Начало работы
+```text
+├── cmd/go-support-bot/   # Точка входа в приложение (main.go)
+├── config/               # Конфигурационные файлы (example.yaml)
+├── internal/
+│   └── app/
+│       ├── clients/      # Интеграции со сторонними API (Telegram, Gemini)
+│       ├── config/       # Парсинг YAML конфигурации
+│       ├── datastruct/   # Основные структуры данных
+│       ├── endpoints/    # Обработчики Telegram и HTTP API
+│       ├── repository/   # Слой работы с БД (PostgreSQL)
+│       └── service/      # Бизнес-логика бота
+├── migration/            # SQL скрипты миграций БД (встраиваются через go:embed)
+├── web/                  # Скомпилированный React-фронтенд (встраивается через go:embed)
+├── webapp/               # Исходный код React WebApp (Vite)
+├── Dockerfile            # Multi-stage сборка проекта
+└── docker-compose.yml    # Инфраструктура для продакшена
+```
 
-### Необходимые условия
+## 🚀 Локальный запуск (Development)
 
-- Go 1.25.7 или выше
-- Docker и Docker Compose (для базы данных)
-- Telegram-бот токен
-- Ключ API Gemini
-- Группа в Telegram для поддержки
+### 1. Подготовка окружения
 
-### Установка
+Убедитесь, что у вас установлены:
 
-1. **Клонируйте репозиторий:**
-   ```bash
-   git clone https://github.com/ftomza/go-support-bot.git
-   cd go-support-bot
-   ```
+* [Go](https://go.dev/doc/install) (1.25+)
+* [Node.js](https://nodejs.org/) (для работы с фронтендом)
+* [Docker](https://www.docker.com/) (для локальной БД)
+* [ngrok](https://ngrok.com/) (опционально, для проброса вебхуков)
 
-2. **Установите зависимости:**
-   ```bash
-   go mod tidy
-   ```
+### 2. Настройка конфигурации
 
-### Конфигурация
+Создайте файл `config/local.yaml` (возьмите за основу `config/example.yaml`) и заполните данные:
 
-1. **Создайте `config/local.yaml`:**
-   Скопируйте и измените `config/local.yaml.example` (вам нужно будет создать этот файл).
+* `telegram.token` — Токен вашего бота (от @BotFather).
+* `telegram.support_group_id` — ID группы, куда будут падать обращения.
+* `telegram.developer_ids` — Массив ID разработчиков (туда будут приходить ошибки).
+* `llm.gemini_api_key` — Ключ от Google AI Studio.
 
-   ```yaml
-   env: "local"
+### 3. Запуск проекта
 
-   telegram:
-     token: "YOUR_TELEGRAM_TOKEN"
-     support_group_id: YOUR_SUPPORT_GROUP_ID # ID вашей группы в Telegram
-     use_webhooks: false
-     developer_ids: [123456789] # ID разработчиков для специальных команд
+Поднимите базу данных:
 
-   database:
-     url: "postgres://user:password@localhost:5432/support_bot"
+```bash
+docker-compose up db -d
 
-   server:
-     port: "8080"
+```
 
-   llm:
-     gemini_api_key: "YOUR_GEMINI_API_KEY"
-     manager_lang: "ru" # Язык менеджеров
-   ```
+Запустите фронтенд в режиме разработки (в отдельном терминале):
 
-2. **Запустите базу данных:**
-   ```bash
-   docker-compose up -d
-   ```
+```bash
+cd webapp
+npm install
+npm run dev
 
-3. **Примените миграции:**
-   Вам понадобится инструмент для миграции, например `go-migrate`.
+```
 
-## Использование
-
-### Запуск бота
-
-Вы можете запустить бота с помощью следующей команды:
+Запустите бэкенд:
 
 ```bash
 go run cmd/go-support-bot/main.go --config config/local.yaml
+
 ```
 
-### Флаги командной строки
+*(Бот автоматически применит SQL миграции к базе при первом запуске).*
 
-- `--config`: Путь к файлу конфигурации (по умолчанию: `config/local.yaml`).
+## 🌍 Развертывание (Production)
 
-## Тестирование
+Проект собирается в **один легковесный Docker-контейнер** (Multi-stage build). Фронтенд и SQL-миграции компилируются и "запекаются" прямо в бинарник Go.
 
-В настоящее время тесты находятся в разработке. Чтобы запустить тесты, используйте:
+### Настройка SSL (Cloudflare Origin CA)
+
+Если вы используете строгий режим Cloudflare (`Full Strict`):
+
+1. Выпустите сертификаты в панели Cloudflare.
+2. Создайте папку `certs` рядом с `docker-compose.yml`.
+3. Положите туда файлы `cert.pem` и `key.pem`.
+4. В `prod.yaml` укажите пути: `cert_file: "/app/certs/cert.pem"`, `key_file: "/app/certs/key.pem"`.
+
+### Деплой на VPS
+
+1. Склонируйте репозиторий на сервер.
+2. Создайте файл `config/prod.yaml` с боевыми ключами.
+3. Выполните сборку и запуск:
 
 ```bash
-go test ./...
+docker compose up -d --build
+
 ```
 
-## Лицензия
+### CI/CD (GitHub Actions)
 
-Этот проект лицензирован по лицензии Apache 2.0. Подробнее см. в файле [LICENSE](LICENSE).
+Проект содержит настроенный workflow `.github/workflows/deploy.yml`.
+При пуше в ветку `main`, GitHub автоматически подключится к вашему серверу по SSH и обновит контейнеры.
+*Необходимо настроить секреты репозитория: `HOST`, `USERNAME` и `SSH_KEY`.*
+
+## 🔒 Безопасность
+
+* Все запросы к API от WebApp валидируются с использованием `X-Telegram-Init-Data` и токена бота, что исключает подделку данных.
+* Доступ к панели управления (команда `/admin`) разрешен только менеджерам из группы поддержки, а сама кнопка отправляется администратору в личные сообщения для приватности.
+
+## 📝 Лицензия
+
+Этот проект лицензирован по лицензии Apache 2.0. Подробнее см. в файле [LICENSE](https://www.google.com/search?q=LICENSE).
+
+```
