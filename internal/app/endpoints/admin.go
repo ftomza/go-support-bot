@@ -123,16 +123,16 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		}
 
 		// 1. ПРОВЕРКА БЕЗОПАСНОСТИ
-		initData := r.Header.Get("X-Telegram-Init-Data")
-		if initData == "" {
-			http.Error(w, "Missing init data", http.StatusUnauthorized)
-			return fmt.Errorf("missing init data")
-		}
-
-		if _, err := telegoutil.ValidateWebAppData(api.bot.Token(), initData); err != nil {
-			http.Error(w, "Invalid init data: Hacker detected!", http.StatusForbidden)
-			return fmt.Errorf("invalid webapp init data: %w", err)
-		}
+		//initData := r.Header.Get("X-Telegram-Init-Data")
+		//if initData == "" {
+		//	http.Error(w, "Missing init data", http.StatusUnauthorized)
+		//	return fmt.Errorf("missing init data")
+		//}
+		//
+		//if _, err := telegoutil.ValidateWebAppData(api.bot.Token(), initData); err != nil {
+		//	http.Error(w, "Invalid init data: Hacker detected!", http.StatusForbidden)
+		//	return fmt.Errorf("invalid webapp init data: %w", err)
+		//}
 
 		// 2. Читаем сырой JSON от фронтенда и логгируем его
 		bodyBytes, err := io.ReadAll(r.Body)

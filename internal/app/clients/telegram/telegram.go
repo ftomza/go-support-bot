@@ -25,6 +25,7 @@ type Client struct {
 type roleCache struct {
 	sync.RWMutex
 	isManager map[int64]bool
+	testMode  map[int64]bool
 }
 
 func NewTelegramBot(token string) (*Client, error) {
@@ -40,6 +41,7 @@ func NewTelegramBot(token string) (*Client, error) {
 		Bot: bot,
 		roles: &roleCache{
 			isManager: make(map[int64]bool),
+			testMode:  make(map[int64]bool),
 		},
 	}, nil
 }
@@ -61,7 +63,12 @@ func (c *Client) IsCustomer(supportGroup int64) th.Predicate {
 		// 1. Проверяем кэш (быстрое чтение)
 		c.roles.RLock()
 		isMgr, exists := c.roles.isManager[userID]
+		isTestMode, _ := c.roles.testMode[userID]
 		c.roles.RUnlock()
+
+		if isTestMode {
+			return true
+		}
 
 		if exists {
 			return !isMgr // Если он менеджер, возвращаем false (он не студент)
@@ -92,9 +99,50 @@ func (c *Client) IsCustomer(supportGroup int64) th.Predicate {
 	}
 }
 
+func (c *Client) IsManager(ctx context.Context, supportGroup int64, userID int64) bool {
+	c.roles.RLock()
+	isMgr, exists := c.roles.isManager[userID]
+	c.roles.RUnlock()
+
+	if exists {
+		return isMgr
+	}
+
+	member, err := c.Bot.GetChatMember(ctx, &telego.GetChatMemberParams{
+		ChatID: tu.ID(supportGroup),
+		UserID: userID,
+	})
+
+	isMgrNow := false
+	if err == nil && member != nil {
+		status := member.MemberStatus()
+		if status == telego.MemberStatusMember ||
+			status == telego.MemberStatusAdministrator ||
+			status == telego.MemberStatusCreator {
+			isMgrNow = true
+		}
+	}
+
+	c.roles.Lock()
+	c.roles.isManager[userID] = isMgrNow
+	c.roles.Unlock()
+
+	return isMgrNow
+}
+
+func (c *Client) ToggleTestMode(userID int64) bool {
+	c.roles.Lock()
+	defer c.roles.Unlock()
+
+	newState := !c.roles.testMode[userID]
+	c.roles.testMode[userID] = newState
+	return newState
+}
+
 func (c *Client) ClearCache() {
 	c.roles.Lock()
 	c.roles.isManager = map[int64]bool{}
+	c.roles.testMode = map[int64]bool{} // Сбрасываем и режим тестов на всякий случай
 	c.roles.Unlock()
 }
 
@@ -104,7 +152,6 @@ func (c *Client) GetChatAdministrators(ctx context.Context, chatID int64) ([]tel
 	})
 }
 
-// IsPrivateChat проверяет, что сообщение пришло из лички с ботом
 func IsPrivateChat() th.Predicate {
 	return func(ctx context.Context, update telego.Update) bool {
 		if update.Message != nil {
@@ -114,7 +161,6 @@ func IsPrivateChat() th.Predicate {
 	}
 }
 
-// IsGroupChat проверяет, что сообщение пришло из группы или супергруппы
 func IsGroupChat() th.Predicate {
 	return func(ctx context.Context, update telego.Update) bool {
 		if update.Message != nil {

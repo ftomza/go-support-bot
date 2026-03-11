@@ -188,7 +188,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 			prompt, _ := e.svc.GetMainPrompt(ctx)
 			if prompt == "" {
-				prompt = "С возвращением! Выберите тему вашего нового обращения:"
+				prompt = "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:"
 			}
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
@@ -207,33 +207,35 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			return err
 		}
 
+		// Если мы ждали имя — сохраняем его
 		if session.WaitingName {
 			if message.Text == "" {
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.AskForText).WithParseMode(telego.ModeHTML))
 				return nil
 			}
 			e.svc.SaveName(customerID, message.Text)
-
-			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
-			prompt, _ := e.svc.GetMainPrompt(ctx)
-
-			// Безопасно экранируем имя пользователя
-			safeName := html.EscapeString(message.Text)
-
-			var finalPrompt string
-			if prompt == "" {
-				finalPrompt = fmt.Sprintf("<b>%s</b>, выберите тему вашего обращения:", safeName)
-			} else {
-				// Склеиваем имя и HTML из базы
-				finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
-			}
-
-			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
-				tu.ID(message.Chat.ID),
-				finalPrompt,
-			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML)) // <--- Добавили ParseMode
-			return nil
+			// Обновляем локальную переменную, чтобы сразу выдать меню ниже
+			session.FullName = message.Text
 		}
+
+		// СЦЕНАРИЙ Г: Имя введено, но топика нет (клиент пишет текст вместо нажатия на кнопку)
+		kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+		prompt, _ := e.svc.GetMainPrompt(ctx)
+
+		// Безопасно экранируем имя пользователя
+		safeName := html.EscapeString(session.FullName)
+
+		var finalPrompt string
+		if prompt == "" {
+			finalPrompt = fmt.Sprintf("<b>%s</b>, пожалуйста, воспользуйтесь кнопками меню ниже для выбора темы:", safeName)
+		} else {
+			finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
+		}
+
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			finalPrompt,
+		).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
 
 		return nil
 	}, telegram.IsPrivateChat(), e.svc.IsCustomer())
@@ -380,4 +382,30 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		}
 		return nil
 	}, telegram.IsGroupChat())
+
+	// КОМАНДА ДЛЯ ПЕРЕКЛЮЧЕНИЯ РЕЖИМА КЛИЕНТА (ТОЛЬКО ДЛЯ АДМИНОВ)
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+		userID := message.From.ID
+
+		// Проверяем, что юзер действительно является менеджером группы
+		if !e.svc.IsManager(ctx, userID) {
+			return nil
+		}
+
+		// Переключаем режим туда-обратно
+		isEnabled := e.svc.ToggleTestMode(userID)
+
+		msg := "👨‍💻 <b>Режим клиента ВЫКЛЮЧЕН</b>\nТеперь вы снова админ. Чтобы протестировать меню, включите режим обратно."
+		if isEnabled {
+			msg = "👤 <b>Режим клиента ВКЛЮЧЕН</b>\n\nТеперь бот будет общаться с вами так же, как с обычным пользователем.\n<i>(Напишите любое текстовое сообщение, чтобы вызвать меню)</i>"
+		}
+
+		_, err := botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(userID),
+			msg,
+		).WithParseMode(telego.ModeHTML))
+
+		return err
+	}, th.CommandEqual("client_mode"), telegram.IsPrivateChat())
 }

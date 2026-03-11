@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 
 const tg = window.Telegram?.WebApp;
 
-const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers }) => {
+const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, onMove, isFirst, isLast, managers }) => {
     const [expanded, setExpanded] = useState(false);
     const isLeaf = !node.SubTheme || Object.keys(node.SubTheme).length === 0;
 
@@ -30,20 +30,27 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
                             onClick={(e) => e.stopPropagation()}
                         />
                     </div>
-                    <div className="flex gap-2">
-                        <button onClick={() => onAddSub(path)} className="text-tg-button p-1" title="Добавить подтему"><Plus size={18}/></button>
-                        <button onClick={() => onDelete(path, name)} className="text-red-500 p-1" title="Удалить"><Trash2 size={18}/></button>
+                    <div className="flex gap-1 items-center">
+                        {onMove && (
+                            <div className="flex bg-tg-bg border border-tg-hint/30 rounded mr-2 h-[28px]">
+                                <button onClick={() => onMove(path, -1)} disabled={isFirst} className={`px-1.5 border-r border-tg-hint/30 flex items-center justify-center ${isFirst ? 'text-tg-hint/30' : 'text-tg-button hover:bg-tg-secondaryBg'}`} title="Вверх"><ArrowUp size={16}/></button>
+                                <button onClick={() => onMove(path, 1)} disabled={isLast} className={`px-1.5 flex items-center justify-center ${isLast ? 'text-tg-hint/30' : 'text-tg-button hover:bg-tg-secondaryBg'}`} title="Вниз"><ArrowDown size={16}/></button>
+                            </div>
+                        )}
+                        <button onClick={() => onAddSub(path)} className="text-tg-button p-1 hover:bg-tg-secondaryBg rounded" title="Добавить подтему"><Plus size={18}/></button>
+                        <button onClick={() => onDelete(path, name)} className="text-red-500 p-1 hover:bg-red-50 rounded" title="Удалить"><Trash2 size={18}/></button>
                     </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2 text-sm">
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-tg-hint font-semibold">Сообщение при выборе (HTML)</label>
-                        <input
+                        <textarea
                             placeholder="Введите текст..."
                             value={node.Text || ''}
                             onChange={(e) => onChange(path, 'Text', e.target.value)}
-                            className="w-full bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link"
+                            rows={3}
+                            className="w-full bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link resize-y min-h-[60px]"
                         />
                     </div>
                     <div className="flex flex-col gap-1">
@@ -76,12 +83,15 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
 
             {expanded && node.SubTheme && (
                 <div className="mt-2">
-                    {Object.entries(node.SubTheme).map(([childName, childNode]) => (
-                        <ThemeNode
-                            key={childName} name={childName} node={childNode} path={[...path, childName]}
-                            onChange={onChange} onDelete={onDelete} onAddSub={onAddSub} managers={managers}
-                        />
-                    ))}
+                    {Object.entries(node.SubTheme)
+                        .sort((a, b) => (a[1].Order || 0) - (b[1].Order || 0))
+                        .map(([childName, childNode], index, arr) => (
+                            <ThemeNode
+                                key={childName} name={childName} node={childNode} path={[...path, childName]}
+                                onChange={onChange} onDelete={onDelete} onAddSub={onAddSub} onMove={onMove}
+                                isFirst={index === 0} isLast={index === arr.length - 1} managers={managers}
+                            />
+                        ))}
                 </div>
             )}
         </div>
@@ -90,17 +100,13 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, managers })
 
 export default function App() {
     const [config, setConfig] = useState(null);
-    const configRef = useRef(null); // Синхронизация данных для сохранения
+    const configRef = useRef(null);
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState('themes');
-
-    // Состояние для кастомного модального окна добавления темы
     const [promptModal, setPromptModal] = useState({ isOpen: false, path: null, value: '' });
 
-    useEffect(() => {
-        configRef.current = config;
-    }, [config]);
+    useEffect(() => { configRef.current = config; }, [config]);
 
     useEffect(() => {
         if (tg) {
@@ -139,10 +145,7 @@ export default function App() {
         try {
             const res = await fetch('/api/config/save', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Telegram-Init-Data': tg?.initData || ''
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
                 body: JSON.stringify(currentConfig)
             });
             if (!res.ok) throw new Error('Ошибка сервера');
@@ -172,16 +175,43 @@ export default function App() {
         });
     };
 
-    // БЕЗОПАСНОЕ УДАЛЕНИЕ С ИСПОЛЬЗОВАНИЕМ НАТИВНОГО POPUP
+    const moveNode = (path, direction) => {
+        setConfig(prev => {
+            const newConfig = JSON.parse(JSON.stringify(prev));
+            let parent = newConfig.Themes;
+            for (let i = 0; i < path.length - 1; i++) parent = parent[path[i]].SubTheme;
+
+            const targetName = path[path.length - 1];
+
+            const siblings = Object.entries(parent).map(([k, v], idx) => {
+                if (v.Order === undefined) v.Order = idx;
+                return [k, v];
+            }).sort((a, b) => a[1].Order - b[1].Order);
+
+            const currentIndex = siblings.findIndex(s => s[0] === targetName);
+            if (currentIndex === -1) return newConfig;
+
+            if (direction === -1 && currentIndex > 0) {
+                const prevName = siblings[currentIndex - 1][0];
+                const temp = parent[targetName].Order;
+                parent[targetName].Order = parent[prevName].Order;
+                parent[prevName].Order = temp;
+            } else if (direction === 1 && currentIndex < siblings.length - 1) {
+                const nextName = siblings[currentIndex + 1][0];
+                const temp = parent[targetName].Order;
+                parent[targetName].Order = parent[nextName].Order;
+                parent[nextName].Order = temp;
+            }
+            return newConfig;
+        });
+    };
+
     const requestDelete = (path, name) => {
         if (tg && tg.showPopup) {
             tg.showPopup({
-                title: 'Удаление',
-                message: `Удалить тему "${name}"?`,
+                title: 'Удаление', message: `Удалить тему "${name}"?`,
                 buttons: [{ id: 'delete', type: 'destructive', text: 'Удалить' }, { type: 'cancel' }]
-            }, (btnId) => {
-                if (btnId === 'delete') performDelete(path);
-            });
+            }, (btnId) => { if (btnId === 'delete') performDelete(path); });
         } else {
             if (window.confirm(`Удалить тему "${name}"?`)) performDelete(path);
         }
@@ -197,19 +227,12 @@ export default function App() {
         });
     };
 
-    // БЕЗОПАСНОЕ ДОБАВЛЕНИЕ ЧЕРЕЗ REACT-МОДАЛКУ
-    const openAddModal = (path) => {
-        setPromptModal({ isOpen: true, path, value: '' });
-    };
+    const openAddModal = (path) => { setPromptModal({ isOpen: true, path, value: '' }); };
 
     const submitAddModal = () => {
         const { path, value } = promptModal;
         const newName = value.trim();
-
-        if (!newName) {
-            setPromptModal({ isOpen: false, path: null, value: '' });
-            return;
-        }
+        if (!newName) return setPromptModal({ isOpen: false, path: null, value: '' });
 
         setConfig(prev => {
             const newConfig = JSON.parse(JSON.stringify(prev));
@@ -225,11 +248,10 @@ export default function App() {
                     }
                 }
             }
-
-            current[newName] = { Text: '', Manager: null, WorkHours: '' };
+            const newOrder = Object.keys(current).length;
+            current[newName] = { Text: '', Manager: null, WorkHours: '', Order: newOrder };
             return newConfig;
         });
-
         setPromptModal({ isOpen: false, path: null, value: '' });
     };
 
@@ -237,52 +259,22 @@ export default function App() {
 
     return (
         <div className="pb-24 relative">
-            {/* Кастомное модальное окно */}
             {promptModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
                     <div className="bg-tg-bg w-full max-w-sm rounded-2xl p-5 shadow-xl border border-tg-hint/20">
                         <h3 className="text-lg font-bold mb-3 text-tg-text">Название новой темы</h3>
-                        <input
-                            autoFocus
-                            type="text"
-                            value={promptModal.value}
-                            onChange={e => setPromptModal(prev => ({ ...prev, value: e.target.value }))}
-                            placeholder="Введите название..."
-                            className="w-full bg-tg-secondaryBg border border-tg-hint/30 rounded-xl p-3 mb-5 outline-none focus:border-tg-link text-tg-text transition-colors"
-                            onKeyDown={e => e.key === 'Enter' && submitAddModal()}
-                        />
+                        <input autoFocus type="text" value={promptModal.value} onChange={e => setPromptModal(prev => ({ ...prev, value: e.target.value }))} placeholder="Введите название..." className="w-full bg-tg-secondaryBg border border-tg-hint/30 rounded-xl p-3 mb-5 outline-none focus:border-tg-link text-tg-text transition-colors" onKeyDown={e => e.key === 'Enter' && submitAddModal()}/>
                         <div className="flex justify-end gap-2">
-                            <button
-                                onClick={() => setPromptModal({ isOpen: false, path: null, value: '' })}
-                                className="px-4 py-2.5 text-tg-hint font-medium hover:bg-tg-secondaryBg rounded-xl transition-colors"
-                            >
-                                Отмена
-                            </button>
-                            <button
-                                onClick={submitAddModal}
-                                className="px-4 py-2.5 bg-tg-button text-tg-buttonText font-bold rounded-xl shadow-sm transition-opacity hover:opacity-90"
-                            >
-                                Добавить
-                            </button>
+                            <button onClick={() => setPromptModal({ isOpen: false, path: null, value: '' })} className="px-4 py-2.5 text-tg-hint font-medium hover:bg-tg-secondaryBg rounded-xl transition-colors">Отмена</button>
+                            <button onClick={submitAddModal} className="px-4 py-2.5 bg-tg-button text-tg-buttonText font-bold rounded-xl shadow-sm transition-opacity hover:opacity-90">Добавить</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Tabs */}
             <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10">
-                <button
-                    className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'themes' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`}
-                    onClick={() => setActiveTab('themes')}
-                >
-                    <Settings size={18}/> Темы
-                </button>
-                <button
-                    className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`}
-                    onClick={() => setActiveTab('texts')}
-                >
-                    <MessageSquare size={18}/> Тексты
-                </button>
+                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'themes' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('themes')}><Settings size={18}/> Темы</button>
+                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('texts')}><MessageSquare size={18}/> Тексты</button>
             </div>
 
             <div className="px-4">
@@ -290,17 +282,17 @@ export default function App() {
                     <div>
                         <div className="flex justify-between items-center mb-4">
                             <h2 className="text-xl font-bold">Дерево категорий</h2>
-                            <button onClick={() => openAddModal([])} className="bg-tg-button text-tg-buttonText px-3 py-1.5 rounded-lg flex items-center gap-1 text-sm shadow">
-                                <Plus size={16}/> Корень
-                            </button>
+                            <button onClick={() => openAddModal([])} className="bg-tg-button text-tg-buttonText px-3 py-1.5 rounded-lg flex items-center gap-1 text-sm shadow"><Plus size={16}/> Корень</button>
                         </div>
-                        {Object.entries(config.Themes).map(([name, node]) => (
-                            <ThemeNode
-                                key={name} name={name} node={node} path={[name]}
-                                onChange={updateTree} onDelete={requestDelete} onAddSub={openAddModal}
-                                managers={managers}
-                            />
-                        ))}
+                        {Object.entries(config.Themes)
+                            .sort((a, b) => (a[1].Order || 0) - (b[1].Order || 0))
+                            .map(([name, node], index, arr) => (
+                                <ThemeNode
+                                    key={name} name={name} node={node} path={[name]}
+                                    onChange={updateTree} onDelete={requestDelete} onAddSub={openAddModal} onMove={moveNode}
+                                    isFirst={index === 0} isLast={index === arr.length - 1} managers={managers}
+                                />
+                            ))}
                     </div>
                 )}
 
@@ -321,12 +313,7 @@ export default function App() {
                                     value={parent[key] || ''}
                                     onChange={(e) => {
                                         const val = e.target.value;
-                                        setConfig(prev => {
-                                            const next = {...prev};
-                                            if (key === 'Text') next[key] = val;
-                                            else next.Messages[key] = val;
-                                            return next;
-                                        });
+                                        setConfig(prev => { const next = {...prev}; if (key === 'Text') next[key] = val; else next.Messages[key] = val; return next; });
                                     }}
                                     className="w-full bg-tg-secondaryBg border border-transparent rounded-xl p-3 min-h-[80px] outline-none focus:border-tg-link transition-colors"
                                 />
@@ -338,9 +325,7 @@ export default function App() {
 
             {!tg?.initData && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-tg-bg border-t border-tg-hint/30">
-                    <button onClick={saveConfig} className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow-lg">
-                        Сохранить (Dev)
-                    </button>
+                    <button onClick={saveConfig} className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow-lg">Сохранить (Dev)</button>
                 </div>
             )}
         </div>
