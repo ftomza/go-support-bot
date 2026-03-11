@@ -8,9 +8,9 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
-	"go-support-bot/internal/app/clients/llm"
 	"log"
 	"net/http"
 	"os"
@@ -18,15 +18,19 @@ import (
 	"syscall"
 	"time"
 
+	"go-support-bot/internal/app/clients/llm"
 	"go-support-bot/internal/app/clients/telegram"
 	"go-support-bot/internal/app/config"
 	"go-support-bot/internal/app/endpoints"
 	"go-support-bot/internal/app/repository"
 	"go-support-bot/internal/app/service"
+	"go-support-bot/migration"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/mymmrac/telego"
 	"github.com/mymmrac/telego/telegohandler"
+	"github.com/pressly/goose/v3"
 )
 
 func main() {
@@ -47,14 +51,39 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	// 1. Инициализируем БД
+	// ==========================================================
+	// 1. Выполняем миграции БД (Goose)
+	// ==========================================================
+	log.Println("Running database migrations...")
+
+	// Goose использует стандартный database/sql, поэтому открываем временное соединение
+	migrationDB, err := sql.Open("pgx", cfg.Database.URL)
+	if err != nil {
+		log.Fatalf("Failed to open DB for migrations: %v", err)
+	}
+
+	goose.SetBaseFS(migration.FS) // Передаем нашу встроенную файловую систему
+	if err := goose.SetDialect("postgres"); err != nil {
+		log.Fatalf("Failed to set goose dialect: %v", err)
+	}
+
+	// Накатываем миграции из корня встроенной ФС
+	if err := goose.Up(migrationDB, "."); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	migrationDB.Close() // Закрываем временное соединение
+	log.Println("Migrations applied successfully!")
+
+	// ==========================================================
+	// 2. Инициализируем основной пул БД (pgxpool)
+	// ==========================================================
 	dbPool, err := pgxpool.New(ctx, cfg.Database.URL)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v", err)
 	}
 	defer dbPool.Close()
 
-	// 2. Инициализируем Telegram клиента
+	// 3. Инициализируем Telegram клиента
 	clientBot, err := telegram.NewTelegramBot(cfg.Telegram.Token)
 	if err != nil {
 		log.Fatalf("Failed to create bot: %v", err)
@@ -65,7 +94,7 @@ func main() {
 		log.Fatalf("Failed to create LLM: %v", err)
 	}
 
-	// 3. Собираем слои
+	// 4. Собираем слои
 	repo := repository.NewSupportRepo(dbPool)
 	svc := service.NewSupportService(repo, clientBot, clientLLM, cfg.LLM.ManagerLang, cfg.Telegram.SupportGroupID)
 	eps := endpoints.NewTelegramEndpoints(svc, cfg.Telegram.DeveloperIDs, cfg.Telegram.MiniAppURL)

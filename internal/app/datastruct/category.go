@@ -22,4 +22,5 @@ type CategoryNode struct {
 	ManagerID  *int64
 	Children   []*CategoryNode
 	WorkHours  *string
+	Order      int
 }

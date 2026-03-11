@@ -1,15 +1,10 @@
-/*
- * Copyright © 2026-present Artem V. Zaborskiy <ftomza@yandex.ru>. All rights reserved.
- *
- * This source code is licensed under the Apache 2.0 license found in the LICENSE file in the root directory of this source tree.
- */
-
 package service
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"go-support-bot/internal/app/datastruct"
 
@@ -25,20 +20,6 @@ type YamlMessages struct {
 	ServerError    string `yaml:"ServerError" json:"ServerError"`
 }
 
-type YamlConfig struct {
-	Text     string               `yaml:"Text" json:"Text"`
-	Messages YamlMessages         `yaml:"Messages" json:"Messages"`
-	Themes   map[string]YamlTheme `yaml:"Themes" json:"Themes"`
-}
-
-type YamlTheme struct {
-	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
-	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
-	WorkHours *string              `yaml:"WorkHours,omitempty" json:"WorkHours,omitempty"`
-	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty" json:"SubTheme,omitempty"`
-}
-
-// Значения по умолчанию, чтобы бот не молчал, если YAML загрузили без блока Messages
 func GetDefaultMessages() YamlMessages {
 	return YamlMessages{
 		WelcomeNewUser: "Привет! Как к тебе обращаться? Напиши свои имя и фамилию.",
@@ -49,7 +30,20 @@ func GetDefaultMessages() YamlMessages {
 	}
 }
 
-// ExportConfig собирает текущую конфигурацию в структуру для API
+type YamlConfig struct {
+	Text     string               `yaml:"Text" json:"Text"`
+	Messages YamlMessages         `yaml:"Messages" json:"Messages"`
+	Themes   map[string]YamlTheme `yaml:"Themes" json:"Themes"`
+}
+
+type YamlTheme struct {
+	Order     int                  `yaml:"Order" json:"Order"` // <--- ДОБАВЛЕНО
+	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
+	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
+	WorkHours *string              `yaml:"WorkHours,omitempty" json:"WorkHours,omitempty"`
+	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty" json:"SubTheme,omitempty"`
+}
+
 func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) {
 	prompt, _ := s.repo.GetMainPrompt(ctx)
 	msgs, _ := s.GetMessages(ctx)
@@ -75,9 +69,10 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 		}
 	}
 
-	var buildTheme func(c datastruct.Category) YamlTheme
-	buildTheme = func(c datastruct.Category) YamlTheme {
+	var buildTheme func(c datastruct.Category, order int) YamlTheme
+	buildTheme = func(c datastruct.Category, order int) YamlTheme {
 		yt := YamlTheme{
+			Order:     order, // Раздаем порядковые номера при экспорте
 			Text:      c.PromptText,
 			Manager:   c.ManagerID,
 			WorkHours: c.WorkHours,
@@ -85,21 +80,20 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 		children := childrenMap[c.ID]
 		if len(children) > 0 {
 			yt.SubTheme = make(map[string]YamlTheme)
-			for _, child := range children {
-				yt.SubTheme[child.Name] = buildTheme(child)
+			for i, child := range children {
+				yt.SubTheme[child.Name] = buildTheme(child, i)
 			}
 		}
 		return yt
 	}
 
-	for _, r := range roots {
-		cfg.Themes[r.Name] = buildTheme(r)
+	for i, r := range roots {
+		cfg.Themes[r.Name] = buildTheme(r, i)
 	}
 
 	return cfg, nil
 }
 
-// ImportConfig принимает структуру (из JSON или YAML) и сохраняет в БД
 func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) error {
 	defaults := GetDefaultMessages()
 	if cfg.Messages.WelcomeNewUser == "" {
@@ -127,10 +121,15 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 			PromptText: yt.Text,
 			ManagerID:  yt.Manager,
 			WorkHours:  yt.WorkHours,
+			Order:      yt.Order, // Сохраняем переданный порядок
 		}
 		for k, v := range yt.SubTheme {
 			node.Children = append(node.Children, buildNode(k, v))
 		}
+		// Сортируем подкатегории перед вставкой
+		sort.Slice(node.Children, func(i, j int) bool {
+			return node.Children[i].Order < node.Children[j].Order
+		})
 		return node
 	}
 
@@ -139,10 +138,14 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 		roots = append(roots, buildNode(k, v))
 	}
 
+	// Сортируем корни перед вставкой
+	sort.Slice(roots, func(i, j int) bool {
+		return roots[i].Order < roots[j].Order
+	})
+
 	return s.repo.ReplaceCategoriesTree(ctx, cfg.Text, msgBytes, roots)
 }
 
-// Теперь старые методы просто вызывают новые
 func (s *SupportService) LoadCategoriesFromYAML(ctx context.Context, data []byte) error {
 	var cfg YamlConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
@@ -175,7 +178,6 @@ func (s *SupportService) GetMainPrompt(ctx context.Context) (string, error) {
 	return s.repo.GetMainPrompt(ctx)
 }
 
-// GetCategoriesKeyboard выдает подменю или главное меню
 func (s *SupportService) GetCategoriesKeyboard(ctx context.Context, parentID *int) (*telego.InlineKeyboardMarkup, error) {
 	categories, err := s.repo.GetCategoriesByParent(ctx, parentID)
 	if err != nil {
@@ -189,10 +191,9 @@ func (s *SupportService) GetCategoriesKeyboard(ctx context.Context, parentID *in
 		})
 	}
 
-	// Если мы в подменю, добавляем кнопку возврата
 	if parentID != nil {
 		keyboard = append(keyboard, []telego.InlineKeyboardButton{
-			{Text: "🔙 В начало", CallbackData: "cat_root"},
+			{Text: "🔙 To Begin", CallbackData: "cat_root"},
 		})
 	}
 

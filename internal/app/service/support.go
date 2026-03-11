@@ -341,3 +341,11 @@ func (s *SupportService) IsCustomer() th.Predicate {
 func (s *SupportService) ClearCacheBotClient() {
 	s.bot.ClearCache()
 }
+
+func (s *SupportService) IsManager(ctx context.Context, userID int64) bool {
+	return s.bot.IsManager(ctx, s.supportGroup, userID)
+}
+
+func (s *SupportService) ToggleTestMode(userID int64) bool {
+	return s.bot.ToggleTestMode(userID)
+}
