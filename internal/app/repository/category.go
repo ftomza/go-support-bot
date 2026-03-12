@@ -36,9 +36,9 @@ func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt stri
 	insertNode = func(parentID *int, node *datastruct.CategoryNode) error {
 		var id int
 		err := tx.QueryRow(ctx, `
-			INSERT INTO categories (parent_id, name, prompt_text, manager_id, work_hours, timezone) 
-			VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-			parentID, node.Name, node.PromptText, node.ManagerID, node.WorkHours, node.Timezone).Scan(&id)
+			INSERT INTO categories (parent_id, name, prompt_text, manager_id, work_hours, timezone, image) 
+			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+			parentID, node.Name, node.PromptText, node.ManagerID, node.WorkHours, node.Timezone, node.Image).Scan(&id)
 		if err != nil {
 			return err
 		}
@@ -73,7 +73,7 @@ func (r *SupportRepo) GetMainPrompt(ctx context.Context) (string, error) {
 
 // GetAllCategoriesFull выгружает всё дерево для экспорта в YAML
 func (r *SupportRepo) GetAllCategoriesFull(ctx context.Context) ([]datastruct.Category, error) {
-	rows, err := r.db.Query(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone FROM categories ORDER BY id")
+	rows, err := r.db.Query(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (r *SupportRepo) GetAllCategoriesFull(ctx context.Context) ([]datastruct.Ca
 	var categories []datastruct.Category
 	for rows.Next() {
 		var c datastruct.Category
-		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone); err != nil {
+		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone, &c.Image); err != nil {
 			return nil, err
 		}
 		categories = append(categories, c)
@@ -91,11 +91,11 @@ func (r *SupportRepo) GetAllCategoriesFull(ctx context.Context) ([]datastruct.Ca
 }
 
 func (r *SupportRepo) GetCategoriesByParent(ctx context.Context, parentID *int) ([]datastruct.Category, error) {
-	query := "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone FROM categories WHERE parent_id IS NULL ORDER BY id"
+	query := "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id IS NULL ORDER BY id"
 	args := []any{}
 
 	if parentID != nil {
-		query = "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone FROM categories WHERE parent_id = $1 ORDER BY id"
+		query = "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id = $1 ORDER BY id"
 		args = append(args, *parentID)
 	}
 
@@ -108,7 +108,7 @@ func (r *SupportRepo) GetCategoriesByParent(ctx context.Context, parentID *int) 
 	var categories []datastruct.Category
 	for rows.Next() {
 		var c datastruct.Category
-		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone); err != nil {
+		if err := rows.Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone, &c.Image); err != nil {
 			return nil, err
 		}
 		categories = append(categories, c)
@@ -118,7 +118,7 @@ func (r *SupportRepo) GetCategoriesByParent(ctx context.Context, parentID *int) 
 
 func (r *SupportRepo) GetCategoryByID(ctx context.Context, id int) (*datastruct.Category, error) {
 	var c datastruct.Category
-	err := r.db.QueryRow(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone FROM categories WHERE id = $1", id).
-		Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone)
+	err := r.db.QueryRow(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE id = $1", id).
+		Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone, &c.Image)
 	return &c, err
 }

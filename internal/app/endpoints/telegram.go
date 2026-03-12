@@ -260,9 +260,16 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			if prompt == "" {
 				prompt = "Выберите тему обращения:"
 			}
-			_, _ = botCtx.Bot().EditMessageText(ctx, &telego.EditMessageTextParams{
+
+			// Удаляем старое сообщение
+			_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
+				ChatID:    tu.ID(customerID),
+				MessageID: query.Message.GetMessageID(),
+			})
+
+			// Присылаем новое главное меню
+			_, _ = botCtx.Bot().SendMessage(ctx, &telego.SendMessageParams{
 				ChatID:      tu.ID(customerID),
-				MessageID:   query.Message.GetMessageID(),
 				Text:        prompt,
 				ReplyMarkup: kb,
 				ParseMode:   telego.ModeHTML,
@@ -275,7 +282,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		}
 
 		categoryID, _ := strconv.Atoi(strings.TrimPrefix(query.Data, "cat_"))
-		category, err := e.svc.GetCategoryByID(ctx, categoryID) // Убедись, что добавил этот метод
+		category, err := e.svc.GetCategoryByID(ctx, categoryID)
 		if err != nil {
 			return nil
 		}
@@ -288,13 +295,30 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 				prompt = "Выберите подтему:"
 			}
 
-			_, _ = botCtx.Bot().EditMessageText(ctx, &telego.EditMessageTextParams{
-				ChatID:      tu.ID(customerID),
-				MessageID:   query.Message.GetMessageID(),
-				Text:        prompt,
-				ParseMode:   telego.ModeHTML,
-				ReplyMarkup: kb,
+			// Удаляем старое меню
+			_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
+				ChatID:    tu.ID(customerID),
+				MessageID: query.Message.GetMessageID(),
 			})
+
+			// Если есть картинка — шлем SendPhoto
+			if category.Image != nil && *category.Image != "" {
+				_, _ = botCtx.Bot().SendPhoto(ctx, &telego.SendPhotoParams{
+					ChatID:      tu.ID(customerID),
+					Photo:       tu.FileFromURL(*category.Image), // Загружаем по URL
+					Caption:     prompt,
+					ParseMode:   telego.ModeHTML,
+					ReplyMarkup: kb,
+				})
+			} else {
+				// Иначе обычный текст
+				_, _ = botCtx.Bot().SendMessage(ctx, &telego.SendMessageParams{
+					ChatID:      tu.ID(customerID),
+					Text:        prompt,
+					ParseMode:   telego.ModeHTML,
+					ReplyMarkup: kb,
+				})
+			}
 			return nil
 		}
 
@@ -313,12 +337,14 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		}
 
 		e.svc.ClearSession(customerID)
-		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.TopicCreated).WithParseMode(telego.ModeHTML))
 
+		// Удаляем меню и пишем "Топик создан"
 		_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
 			ChatID:    tu.ID(customerID),
 			MessageID: query.Message.GetMessageID(),
 		})
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.TopicCreated).WithParseMode(telego.ModeHTML))
+
 		return nil
 	}, e.svc.IsCustomer())
 

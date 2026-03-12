@@ -39,6 +39,7 @@ type YamlConfig struct {
 type YamlTheme struct {
 	Order     int                  `yaml:"Order" json:"Order"` // <--- ДОБАВЛЕНО
 	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
+	Image     *string              `yaml:"Image,omitempty" json:"Image,omitempty"`
 	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
 	WorkHours *string              `yaml:"WorkHours,omitempty" json:"WorkHours,omitempty"`
 	Timezone  *string              `yaml:"Timezone,omitempty" json:"Timezone,omitempty"`
@@ -78,6 +79,7 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 			Manager:   c.ManagerID,
 			WorkHours: c.WorkHours,
 			Timezone:  c.Timezone,
+			Image:     c.Image,
 		}
 		children := childrenMap[c.ID]
 		if len(children) > 0 {
@@ -125,6 +127,7 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 			WorkHours:  yt.WorkHours,
 			Timezone:   yt.Timezone,
 			Order:      yt.Order, // Сохраняем переданный порядок
+			Image:      yt.Image, // Сохраняем переданный порядок
 		}
 		for k, v := range yt.SubTheme {
 			node.Children = append(node.Children, buildNode(k, v))
