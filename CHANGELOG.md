@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.4] - 2026-03-12
+
+### Added
+- **Timezone Support**: Added timezone selection for category working hours. The backend now accurately calculates availability based on the specific location (e.g., `Asia/Dubai`, `Europe/Moscow`), and `tzdata` was included in the Docker image.
+- **Category Images**: Administrators can now attach image URLs to categories via the WebApp. The bot dynamically sends these as photo messages with inline keyboards.
+- **Smart Navigation**: Added a "🔙 Назад" (Back) button to return to the previous category level, alongside the "🏠 В начало" (Home) button for deep menu hierarchies.
+- New Goose database migrations for `timezone` and `image` columns.
+
+### Changed
+- Improved the out-of-hours notification text to explicitly display the timezone context to the user (e.g., `09:00-18:00 (Asia/Dubai)`).
+- Refactored Telegram menu navigation logic: the bot now deletes the previous message and sends a new one (instead of editing) to seamlessly support transitions between text-only and media (photo) messages.
+- Updated React WebApp UI to include timezone dropdowns, image URL inputs, and live image previews.
+
+### Fixed
+- Fixed a routing bug where the `/client_mode` command was intercepted by the global catch-all text handler. Strict commands are now correctly prioritized at the top of the handler chain.
+
 ## [0.0.3] - 2026-03-11
 
 ### Added
