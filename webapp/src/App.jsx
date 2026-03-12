@@ -53,6 +53,22 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, onMove, isF
                             className="w-full bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link resize-y min-h-[60px]"
                         />
                     </div>
+
+                    {/* НОВОЕ ПОЛЕ */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-xs text-tg-hint font-semibold">Картинка (URL)</label>
+                        <input
+                            type="text"
+                            placeholder="https://example.com/image.jpg"
+                            value={node.Image || ''}
+                            onChange={(e) => onChange(path, 'Image', e.target.value)}
+                            className="w-full bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link"
+                        />
+                        {node.Image && (
+                            <img src={node.Image} alt="preview" className="mt-1 h-12 object-cover rounded border border-tg-hint/30" onError={(e) => e.target.style.display='none'} />
+                        )}
+                    </div>
+
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-tg-hint font-semibold">Менеджер</label>
                         <select
@@ -266,7 +282,7 @@ export default function App() {
                 }
             }
             const newOrder = Object.keys(current).length;
-            current[newName] = { Text: '', Manager: null, WorkHours: '', Timezone: 'UTC', Order: newOrder };
+            current[newName] = { Text: '', Image: '', Manager: null, WorkHours: '', Timezone: 'UTC', Order: newOrder };
             return newConfig;
         });
         setPromptModal({ isOpen: false, path: null, value: '' });
