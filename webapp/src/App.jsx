@@ -72,10 +72,27 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, onMove, isF
                         <label className="text-xs text-tg-hint font-semibold flex items-center gap-1">
                             <Clock size={12}/> Часы работы (пусто = 24/7)
                         </label>
-                        <div className="flex items-center gap-2">
-                            <input type="time" value={startTime} onChange={(e) => handleTimeChange('start', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1" />
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <input type="time" value={startTime} onChange={(e) => handleTimeChange('start', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1 min-w-[100px]" />
                             <span className="text-tg-hint">—</span>
-                            <input type="time" value={endTime} onChange={(e) => handleTimeChange('end', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1" />
+                            <input type="time" value={endTime} onChange={(e) => handleTimeChange('end', e.target.value)} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1 min-w-[100px]" />
+
+                            <select
+                                value={node.Timezone || 'UTC'}
+                                onChange={(e) => onChange(path, 'Timezone', e.target.value)}
+                                className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 outline-none focus:border-tg-link flex-1 min-w-[120px]"
+                            >
+                                <option value="UTC">UTC</option>
+                                <option value="Europe/Moscow">Europe/Moscow</option>
+                                <option value="Europe/Kiev">Europe/Kiev</option>
+                                <option value="Asia/Dubai">Asia/Dubai</option>
+                                <option value="Asia/Tbilisi">Asia/Tbilisi</option>
+                                <option value="Asia/Almaty">Asia/Almaty</option>
+                                <option value="Asia/Yerevan">Asia/Yerevan</option>
+                                <option value="Asia/Bangkok">Asia/Bangkok</option>
+                                <option value="Europe/London">Europe/London</option>
+                                <option value="America/New_York">America/New_York</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -249,7 +266,7 @@ export default function App() {
                 }
             }
             const newOrder = Object.keys(current).length;
-            current[newName] = { Text: '', Manager: null, WorkHours: '', Order: newOrder };
+            current[newName] = { Text: '', Manager: null, WorkHours: '', Timezone: 'UTC', Order: newOrder };
             return newConfig;
         });
         setPromptModal({ isOpen: false, path: null, value: '' });

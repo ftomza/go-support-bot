@@ -28,6 +28,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /app/bin/bot ./cmd/go-support-bot/main.
 # ЭТАП 3: Финальный образ (максимально легкий)
 # ==========================================
 FROM alpine:latest
+RUN apk add --no-cache tzdata
 WORKDIR /app
 # Копируем только сам бинарник, миграции и конфиг
 COPY --from=backend-builder /app/bin/bot ./bot

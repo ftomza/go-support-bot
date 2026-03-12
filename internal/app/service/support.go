@@ -137,7 +137,7 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 	}
 
 	if category, err := s.repo.GetCategoryByID(ctx, topic.CategoryID); err == nil {
-		s.notifyOutOfHoursIfNeeded(ctx, msg.From.ID, category.WorkHours)
+		s.notifyOutOfHoursIfNeeded(ctx, msg.From.ID, category.WorkHours, category.Timezone)
 	}
 	return err
 }
@@ -273,35 +273,45 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 	}
 
 	// 3. Проверяем рабочие часы и при необходимости шлем автоответ
-	s.notifyOutOfHoursIfNeeded(ctx, customerID, category.WorkHours)
+	s.notifyOutOfHoursIfNeeded(ctx, customerID, category.WorkHours, category.Timezone)
 
 	return nil
 }
 
 // isWorkingHours проверяет, входит ли текущее время в интервал (например, "09:00-18:00")
-func isWorkingHours(workHours *string) bool {
+func isWorkingHours(workHours *string, tz *string) bool {
 	if workHours == nil || *workHours == "" {
-		return true // Если график не указан, работаем 24/7
+		return true // 24/7
 	}
 	parts := strings.Split(*workHours, "-")
 	if len(parts) != 2 {
-		return true // Защита от кривого конфига
+		return true
 	}
 
+	// По умолчанию UTC
+	location := time.UTC
+	if tz != nil && *tz != "" {
+		if loc, err := time.LoadLocation(*tz); err == nil {
+			location = loc
+		} else {
+			log.Printf("invalid timezone %s: %v", *tz, err)
+		}
+	}
+
+	// Берем время именно в нужном часовом поясе
+	now := time.Now().In(location).Format("15:04")
 	start := strings.TrimSpace(parts[0])
 	end := strings.TrimSpace(parts[1])
-	now := time.Now().Format("15:04") // Текущее время в формате ЧЧ:ММ
 
 	if start <= end {
 		return now >= start && now <= end
 	}
-	// Поддержка ночных смен (например, "22:00-06:00")
 	return now >= start || now <= end
 }
 
 // notifyOutOfHoursIfNeeded отправляет отбивку, если сейчас нерабочее время (не чаще 1 раза в 30 минут)
-func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerID int64, workHours *string) {
-	if isWorkingHours(workHours) {
+func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerID int64, workHours *string, timezone *string) {
+	if isWorkingHours(workHours, timezone) {
 		return
 	}
 
@@ -316,8 +326,17 @@ func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerI
 		return
 	}
 
-	// Подставляем часы работы в динамический текст
-	msgText := fmt.Sprintf(msgs.OutOfHours, *workHours)
+	// Определяем таймзону для вывода клиенту
+	tz := "UTC"
+	if timezone != nil && *timezone != "" {
+		tz = *timezone
+	}
+
+	// Склеиваем часы и зону в одну строку: "09:00-18:00 (Asia/Dubai)"
+	hoursWithZone := fmt.Sprintf("%s (%s)", *workHours, tz)
+
+	// Подставляем объединенную строку в динамический текст
+	msgText := fmt.Sprintf(msgs.OutOfHours, hoursWithZone)
 
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    tu.ID(customerID),

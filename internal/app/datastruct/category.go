@@ -13,6 +13,7 @@ type Category struct {
 	PromptText string
 	ManagerID  *int64 // Pointer, так как у родительских тем менеджера нет
 	WorkHours  *string
+	Timezone   *string
 }
 
 // CategoryNode используется для рекурсивного сохранения распарсенного YAML
@@ -22,5 +23,6 @@ type CategoryNode struct {
 	ManagerID  *int64
 	Children   []*CategoryNode
 	WorkHours  *string
+	Timezone   *string
 	Order      int
 }

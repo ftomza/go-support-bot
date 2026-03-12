@@ -41,6 +41,7 @@ type YamlTheme struct {
 	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
 	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
 	WorkHours *string              `yaml:"WorkHours,omitempty" json:"WorkHours,omitempty"`
+	Timezone  *string              `yaml:"Timezone,omitempty" json:"Timezone,omitempty"`
 	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty" json:"SubTheme,omitempty"`
 }
 
@@ -76,6 +77,7 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 			Text:      c.PromptText,
 			Manager:   c.ManagerID,
 			WorkHours: c.WorkHours,
+			Timezone:  c.Timezone,
 		}
 		children := childrenMap[c.ID]
 		if len(children) > 0 {
@@ -121,6 +123,7 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 			PromptText: yt.Text,
 			ManagerID:  yt.Manager,
 			WorkHours:  yt.WorkHours,
+			Timezone:   yt.Timezone,
 			Order:      yt.Order, // Сохраняем переданный порядок
 		}
 		for k, v := range yt.SubTheme {
@@ -191,10 +194,28 @@ func (s *SupportService) GetCategoriesKeyboard(ctx context.Context, parentID *in
 		})
 	}
 
+	// Если мы находимся внутри подменю, добавляем кнопки навигации
 	if parentID != nil {
-		keyboard = append(keyboard, []telego.InlineKeyboardButton{
-			{Text: "🔙 To Begin", CallbackData: "cat_root"},
-		})
+		currCat, err := s.GetCategoryByID(ctx, *parentID)
+		if err == nil {
+			var navRow []telego.InlineKeyboardButton
+
+			if currCat.ParentID == nil {
+				// Мы на первом уровне вложенности -> возврат в самый корень
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🔙 Back", CallbackData: "cat_root"})
+			} else {
+				// Мы глубже 1-го уровня -> возврат на папку выше + кнопка в корень
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🔙 Back", CallbackData: fmt.Sprintf("cat_%d", *currCat.ParentID)})
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🏠 To Begin", CallbackData: "cat_root"})
+			}
+
+			keyboard = append(keyboard, navRow)
+		} else {
+			// Обычный фолбэк на случай непредвиденной ошибки БД
+			keyboard = append(keyboard, []telego.InlineKeyboardButton{
+				{Text: "🔙 В начало", CallbackData: "cat_root"},
+			})
+		}
 	}
 
 	return &telego.InlineKeyboardMarkup{InlineKeyboard: keyboard}, nil
