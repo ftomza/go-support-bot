@@ -1,0 +1,58 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*' # Ворклоу будет запускаться только при пуше тегов, начинающихся с "v" (например, v0.0.4)
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Важно: даем права на создание релиза в репозитории
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Frontend (React)
+        run: |
+          cd webapp
+          npm ci
+          npm run build
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x' # Версия из твоего go.mod
+
+      - name: Build Backend Binaries
+        run: |
+          # Флаги -s -w вырезают отладочную информацию, делая бинарники меньше
+          
+          # Linux (x86_64 и ARM)
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o support-bot-linux-amd64 ./cmd/go-support-bot/main.go
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o support-bot-linux-arm64 ./cmd/go-support-bot/main.go
+          
+          # Windows (x86_64)
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o support-bot-windows-amd64.exe ./cmd/go-support-bot/main.go
+          
+          # macOS (Intel и Apple Silicon)
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o support-bot-darwin-amd64 ./cmd/go-support-bot/main.go
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o support-bot-darwin-arm64 ./cmd/go-support-bot/main.go
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            support-bot-linux-amd64
+            support-bot-linux-arm64
+            support-bot-windows-amd64.exe
+            support-bot-darwin-amd64
+            support-bot-darwin-arm64
+          generate_release_notes: true # Автоматически сгенерирует список изменений из коммитов
