@@ -156,7 +156,9 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 
 		// Обновляем ID топика в базе данных
 		topic.TopicID = newTopic.MessageThreadID
-		_ = s.repo.SaveTopic(ctx, customerID, topic.TopicID, topic.CategoryID, topic.LangCode)
+		if err = s.repo.SaveTopic(ctx, customerID, topic.TopicID, topic.CategoryID, topic.LangCode); err != nil {
+			log.Printf("failed to save new topic ID %d for customer %d: %v", topic.TopicID, customerID, err)
+		}
 
 		// Уведомляем менеджеров
 		category, _ := s.repo.GetCategoryByID(ctx, topic.CategoryID)
@@ -465,12 +467,14 @@ func (s *SupportService) CloseTopicByClient(ctx context.Context, customerID int6
 	}
 
 	// 2. Отправляем уведомление менеджеру прямо в топик
-	_, _ = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topic.TopicID,
 		Text:            "❌ <b>Обращение завершено клиентом.</b>\nТема закрыта для новых сообщений.",
 		ParseMode:       telego.ModeHTML,
-	})
+	}); err != nil {
+		log.Printf("failed to notify manager about client topic closure for topic %d: %v", topic.TopicID, err)
+	}
 
 	// 3. Закрываем сам топик (ветку форума) в Телеграме
 	err = s.bot.Bot.CloseForumTopic(ctx, &telego.CloseForumTopicParams{

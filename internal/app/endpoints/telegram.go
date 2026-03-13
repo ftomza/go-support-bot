@@ -261,7 +261,9 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 			// Находим клиента и убираем у него клавиатуру
 			customerID, err := e.svc.GetCustomerID(ctx, topicID)
-			if err == nil {
+			if err != nil {
+				log.Printf("failed to get customer ID for topic %d: %v", topicID, err)
+			} else {
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
 					"✅ Менеджер завершил диалог. Спасибо за обращение!",
@@ -275,7 +277,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 				}
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
-					prompt,
+					html.EscapeString(prompt),
 				).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
 			}
 		}
@@ -450,9 +452,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 				if prompt == "" {
 					prompt = "Вы можете открыть новое обращение, выбрав тему ниже:"
 				}
+
+				// Заменяем отправку prompt на html.EscapeString(prompt)
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
-					prompt,
+					html.EscapeString(prompt),
 				).WithReplyMarkup(catKb).WithParseMode(telego.ModeHTML))
 
 				return nil
@@ -479,9 +483,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			if prompt == "" {
 				prompt = "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:"
 			}
+
+			// Заменяем отправку prompt на html.EscapeString(prompt)
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				prompt,
+				html.EscapeString(prompt),
 			).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
 			return nil
 		}
