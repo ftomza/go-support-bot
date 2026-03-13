@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.5] - 2026-03-13
+
+### Added
+- **Client-Side Topic Closure**: Clients can now explicitly end their support session using a permanent reply keyboard button. This updates the database, notifies the manager, and physically closes the Telegram forum topic.
+- **Customizable Close Button**: Added configuration for the "Close Topic" button text directly in the React WebApp Admin Panel.
+- **Manual Language Override**: Managers can now use the `/set_lang <lang_code>` command (e.g., `/set_lang es`) inside a topic to force the AI to translate messages to a specific language, overriding the client's default Telegram language.
+- **Resilient Topic Re-creation**: Implemented a failsafe mechanism. If an administrator accidentally deletes a forum topic, the bot will gracefully catch the "message thread not found" error, automatically create a new topic, and deliver the pending message without interruption.
+- **Automated GitHub Releases**: Added a GitHub Actions workflow (`release.yml`) to automatically build and publish Go binaries (for Linux, Windows, and macOS) whenever a new version tag (`v*`) is pushed.
+
+### Changed
+- **Localized Out-of-Hours Notifications**: The automated "out of office/working hours" reply is now dynamically translated into the client's specific language using the Gemini LLM.
+
+### Fixed
+- Fixed an API error caused by empty keyboard buttons for legacy database records by enforcing default fallback values for the `CloseTopicButton` text.
+- Fixed a Go interface pointer receiver issue when using `telego.ReplyKeyboardRemove` to hide the client's keyboard upon topic closure.
+
 ## [0.0.4] - 2026-03-12
 
 ### Added

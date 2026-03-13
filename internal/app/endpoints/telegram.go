@@ -204,15 +204,80 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		return err
 	}, th.CommandEqual("get_yaml"), telegram.IsGroupChat())
 
+	// Команда /set_lang для принудительной смены языка клиента
+	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
+		ctx := botCtx.Context()
+
+		// Проверяем, что команду вызвали внутри конкретного топика клиента
+		if !message.IsTopicMessage {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Эту команду нужно использовать внутри ветки (топика) клиента.",
+			).WithMessageThreadID(message.MessageThreadID))
+			return nil
+		}
+
+		// Разбиваем сообщение, чтобы достать аргумент (например, "es" из "/set_lang es")
+		parts := strings.Fields(message.Text)
+		if len(parts) < 2 {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Пожалуйста, укажите код языка. Пример: <code>/set_lang es</code>",
+			).WithParseMode(telego.ModeHTML).WithMessageThreadID(message.MessageThreadID))
+			return nil
+		}
+
+		langCode := parts[1]
+		topicID := message.MessageThreadID
+
+		err := e.svc.SetCustomerLangByTopic(ctx, topicID, langCode)
+		if err != nil {
+			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+				tu.ID(message.Chat.ID),
+				"❌ Ошибка: не удалось найти клиента для этого топика.",
+			).WithMessageThreadID(message.MessageThreadID))
+			return nil
+		}
+
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(message.Chat.ID),
+			fmt.Sprintf("✅ Язык клиента успешно изменен на <b>%s</b>.\nТеперь все его входящие и ваши исходящие сообщения будут переводиться с учетом этого языка.", html.EscapeString(langCode)),
+		).WithParseMode(telego.ModeHTML).WithMessageThreadID(message.MessageThreadID))
+
+		return nil
+	}, th.CommandEqual("set_lang"), telegram.IsGroupChat())
+
 	// 1. ЗАКРЫТИЕ ТОПИКА (Менеджер решил проблему)
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
 		ctx := botCtx.Context()
-		err := e.svc.CloseTopic(ctx, message.MessageThreadID)
+		topicID := message.MessageThreadID
+
+		err := e.svc.CloseTopic(ctx, topicID)
 		if err == nil {
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
 				"✅ Топик закрыт. Обращение клиента переведено в статус решенных.",
 			).WithReplyParameters(&telego.ReplyParameters{MessageID: message.MessageID}))
+
+			// Находим клиента и убираем у него клавиатуру
+			customerID, err := e.svc.GetCustomerID(ctx, topicID)
+			if err == nil {
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					"✅ Менеджер завершил диалог. Спасибо за обращение!",
+				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
+
+				// Сразу предлагаем меню для новых вопросов
+				kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+				prompt, _ := e.svc.GetMainPrompt(ctx)
+				if prompt == "" {
+					prompt = "Если у вас появятся новые вопросы, выберите тему ниже:"
+				}
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					prompt,
+				).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
+			}
 		}
 		return err
 	}, telegram.IsGroupChat(), telegram.IsTopicClosed())
@@ -338,12 +403,21 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		e.svc.ClearSession(customerID)
 
-		// Удаляем меню и пишем "Топик создан"
+		// Удаляем инлайн-меню
 		_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
 			ChatID:    tu.ID(customerID),
 			MessageID: query.Message.GetMessageID(),
 		})
-		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.TopicCreated).WithParseMode(telego.ModeHTML))
+
+		// Создаем постоянную Reply-кнопку для клиента
+		kb := tu.Keyboard(
+			tu.KeyboardRow(tu.KeyboardButton(msgs.CloseTopicButton)),
+		).WithResizeKeyboard()
+
+		// Отправляем уведомление с кнопкой
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(customerID), msgs.TopicCreated).
+			WithParseMode(telego.ModeHTML).
+			WithReplyMarkup(kb))
 
 		return nil
 	}, e.svc.IsCustomer())
@@ -358,11 +432,48 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		// СЦЕНАРИЙ А: Топик ЕСТЬ и он ОТКРЫТ (просто пересылаем вопрос)
 		if err == nil && !topic.IsClosed {
+			msgs, _ := e.svc.GetMessages(ctx)
+
+			// Проверяем, не нажал ли клиент кнопку закрытия
+			if message.Text == msgs.CloseTopicButton {
+				_ = e.svc.CloseTopicByClient(ctx, customerID)
+
+				// Убираем клавиатуру и благодарим
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					"✅ Диалог успешно завершен. Спасибо!",
+				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
+
+				// Сразу выдаем главное меню
+				catKb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+				prompt, _ := e.svc.GetMainPrompt(ctx)
+				if prompt == "" {
+					prompt = "Вы можете открыть новое обращение, выбрав тему ниже:"
+				}
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					prompt,
+				).WithReplyMarkup(catKb).WithParseMode(telego.ModeHTML))
+
+				return nil
+			}
+
+			// Иначе просто пересылаем сообщение менеджеру
 			return e.svc.HandleCustomerMessage(ctx, &message)
 		}
 
 		// СЦЕНАРИЙ Б: Топик ЕСТЬ, но он ЗАКРЫТ (клиент пишет новое обращение спустя время)
 		if err == nil && topic.IsClosed {
+			msgs, _ := e.svc.GetMessages(ctx)
+
+			// Защита: если клиент случайно нажал старую кнопку, просто убираем её
+			if message.Text == msgs.CloseTopicButton {
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					"Обращение уже было закрыто.",
+				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
+			}
+
 			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 			prompt, _ := e.svc.GetMainPrompt(ctx)
 			if prompt == "" {

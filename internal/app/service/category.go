@@ -13,20 +13,22 @@ import (
 )
 
 type YamlMessages struct {
-	WelcomeNewUser string `yaml:"WelcomeNewUser" json:"WelcomeNewUser"`
-	AskForText     string `yaml:"AskForText" json:"AskForText"`
-	TopicCreated   string `yaml:"TopicCreated" json:"TopicCreated"`
-	OutOfHours     string `yaml:"OutOfHours" json:"OutOfHours"`
-	ServerError    string `yaml:"ServerError" json:"ServerError"`
+	WelcomeNewUser   string `yaml:"WelcomeNewUser" json:"WelcomeNewUser"`
+	AskForText       string `yaml:"AskForText" json:"AskForText"`
+	TopicCreated     string `yaml:"TopicCreated" json:"TopicCreated"`
+	OutOfHours       string `yaml:"OutOfHours" json:"OutOfHours"`
+	ServerError      string `yaml:"ServerError" json:"ServerError"`
+	CloseTopicButton string `yaml:"CloseTopicButton" json:"CloseTopicButton"`
 }
 
 func GetDefaultMessages() YamlMessages {
 	return YamlMessages{
-		WelcomeNewUser: "Привет! Как к тебе обращаться? Напиши свои имя и фамилию.",
-		AskForText:     "Пожалуйста, используй текст.",
-		TopicCreated:   "✅ Обращение зарегистрировано! Напишите ваш вопрос ниже.",
-		OutOfHours:     "🌙 <b>Внимание: нерабочее время</b>\nМенеджеры этой линии сейчас отдыхают. Ваше сообщение сохранено и будет обработано в рабочие часы (<b>%s</b>).",
-		ServerError:    "Ошибка сервера. Попробуйте позже.",
+		WelcomeNewUser:   "Привет! Как к тебе обращаться? Напиши свои имя и фамилию.",
+		AskForText:       "Пожалуйста, используй текст.",
+		TopicCreated:     "✅ Обращение зарегистрировано! Напишите ваш вопрос ниже.",
+		OutOfHours:       "🌙 <b>Внимание: нерабочее время</b>\nМенеджеры этой линии сейчас отдыхают. Ваше сообщение сохранено и будет обработано в рабочие часы (<b>%s</b>).",
+		ServerError:      "Ошибка сервера. Попробуйте позже.",
+		CloseTopicButton: "❌ Завершить обращение",
 	}
 }
 
@@ -115,6 +117,9 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 	if cfg.Messages.ServerError == "" {
 		cfg.Messages.ServerError = defaults.ServerError
 	}
+	if cfg.Messages.CloseTopicButton == "" {
+		cfg.Messages.CloseTopicButton = defaults.CloseTopicButton
+	}
 
 	msgBytes, _ := json.Marshal(cfg.Messages)
 
@@ -173,10 +178,33 @@ func (s *SupportService) GetMessages(ctx context.Context) (YamlMessages, error) 
 	if err != nil || val == "" {
 		return GetDefaultMessages(), nil
 	}
+
 	var msgs YamlMessages
 	if err := json.Unmarshal([]byte(val), &msgs); err != nil {
 		return GetDefaultMessages(), nil
 	}
+
+	// ЗАЩИТА: Если в старой БД нет новых полей, заполняем их дефолтными значениями
+	defaults := GetDefaultMessages()
+	if msgs.WelcomeNewUser == "" {
+		msgs.WelcomeNewUser = defaults.WelcomeNewUser
+	}
+	if msgs.AskForText == "" {
+		msgs.AskForText = defaults.AskForText
+	}
+	if msgs.TopicCreated == "" {
+		msgs.TopicCreated = defaults.TopicCreated
+	}
+	if msgs.OutOfHours == "" {
+		msgs.OutOfHours = defaults.OutOfHours
+	}
+	if msgs.ServerError == "" {
+		msgs.ServerError = defaults.ServerError
+	}
+	if msgs.CloseTopicButton == "" {
+		msgs.CloseTopicButton = defaults.CloseTopicButton
+	}
+
 	return msgs, nil
 }
 
