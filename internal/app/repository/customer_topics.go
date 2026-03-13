@@ -40,3 +40,9 @@ func (r *SupportRepo) SetTopicStatus(ctx context.Context, topicID int, isClosed 
 	_, err := r.db.Exec(ctx, "UPDATE customer_topics SET is_closed = $1 WHERE topic_id = $2", isClosed, topicID)
 	return err
 }
+
+// UpdateCustomerLang принудительно обновляет язык для клиента
+func (r *SupportRepo) UpdateCustomerLang(ctx context.Context, customerID int64, langCode string) error {
+	_, err := r.db.Exec(ctx, "UPDATE customer_topics SET lang_code = $1 WHERE customer_id = $2", langCode, customerID)
+	return err
+}

@@ -101,45 +101,107 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 		textToTranslate = msg.Caption
 	}
 
-	// По умолчанию текст равен оригиналу
 	translatedText := textToTranslate
-
-	// Вызываем Gemini ТОЛЬКО если языки отличаются
-	// Используем HasPrefix, чтобы "ru-RU" совпало с "ru"
 	if textToTranslate != "" && !strings.HasPrefix(topic.LangCode, s.managerLang) {
 		translatedText = s.llm.Translate(ctx, textToTranslate, s.managerLang)
 	}
 
-	// Если это просто текст
+	var sendErr error
+
+	// Пытаемся отправить сообщение в топик
 	if msg.Text != "" {
 		finalText := translatedText
-
-		// Добавляем оригинал, только если реально был сделан перевод
 		if translatedText != msg.Text {
 			finalText = fmt.Sprintf("%s\n\n<i>Оригинал: %s</i>", translatedText, msg.Text)
 		}
-
-		_, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+		_, sendErr = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topic.TopicID,
 			Text:            finalText,
 			ParseMode:       telego.ModeHTML,
 		})
 	} else {
-		// Если это картинка/файл, копируем медиа, но подменяем caption
-		_, err = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
+		_, sendErr = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			FromChatID:      tu.ID(customerID),
 			MessageID:       msg.MessageID,
 			MessageThreadID: topic.TopicID,
-			Caption:         translatedText, // Заменяем оригинальную подпись на перевод
+			Caption:         translatedText,
 		})
 	}
 
-	if category, err := s.repo.GetCategoryByID(ctx, topic.CategoryID); err == nil {
-		s.notifyOutOfHoursIfNeeded(ctx, msg.From.ID, category.WorkHours, category.Timezone)
+	// ========================================================
+	// ПЕРЕХВАТ ОШИБКИ: Если топик удален администратором
+	// ========================================================
+	if sendErr != nil && (strings.Contains(sendErr.Error(), "message thread not found") || strings.Contains(sendErr.Error(), "thread not found")) {
+		log.Printf("Topic %d not found for customer %d. Recreating...", topic.TopicID, customerID)
+
+		fullName := msg.From.FirstName
+		if msg.From.LastName != "" {
+			fullName += " " + msg.From.LastName
+		}
+		topicName := fullName
+		if msg.From.Username != "" {
+			topicName = fmt.Sprintf("%s [@%s]", fullName, msg.From.Username)
+		}
+
+		// Создаем новый топик
+		newTopic, err := s.bot.Bot.CreateForumTopic(ctx, &telego.CreateForumTopicParams{
+			ChatID: tu.ID(s.supportGroup),
+			Name:   topicName,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to recreate topic: %w", err)
+		}
+
+		// Обновляем ID топика в базе данных
+		topic.TopicID = newTopic.MessageThreadID
+		if err = s.repo.SaveTopic(ctx, customerID, topic.TopicID, topic.CategoryID, topic.LangCode); err != nil {
+			log.Printf("failed to save new topic ID %d for customer %d: %v", topic.TopicID, customerID, err)
+		}
+
+		// Уведомляем менеджеров
+		category, _ := s.repo.GetCategoryByID(ctx, topic.CategoryID)
+		safeCategoryName := "Неизвестно"
+		if category != nil {
+			safeCategoryName = html.EscapeString(category.Name)
+		}
+
+		_, _ = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+			ChatID:          tu.ID(s.supportGroup),
+			MessageThreadID: topic.TopicID,
+			Text:            fmt.Sprintf("🔄 <b>Обращение пересоздано</b> (старый топик был удален)\nВыбрана тема: %s\nКлиент: %s", safeCategoryName, html.EscapeString(fullName)),
+			ParseMode:       telego.ModeHTML,
+		})
+
+		// Повторяем отправку самого сообщения в НОВЫЙ топик
+		if msg.Text != "" {
+			finalText := translatedText
+			if translatedText != msg.Text {
+				finalText = fmt.Sprintf("%s\n\n<i>Оригинал: %s</i>", translatedText, msg.Text)
+			}
+			_, sendErr = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+				ChatID:          tu.ID(s.supportGroup),
+				MessageThreadID: topic.TopicID,
+				Text:            finalText,
+				ParseMode:       telego.ModeHTML,
+			})
+		} else {
+			_, sendErr = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
+				ChatID:          tu.ID(s.supportGroup),
+				FromChatID:      tu.ID(customerID),
+				MessageID:       msg.MessageID,
+				MessageThreadID: topic.TopicID,
+				Caption:         translatedText,
+			})
+		}
 	}
-	return err
+
+	// Отбивка о часах работы
+	if category, err := s.repo.GetCategoryByID(ctx, topic.CategoryID); err == nil {
+		s.notifyOutOfHoursIfNeeded(ctx, msg.From.ID, category.WorkHours, category.Timezone, topic.LangCode)
+	}
+	return sendErr
 }
 
 // HandleManagerMessage обрабатывает сообщение от менеджера
@@ -222,31 +284,44 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 		}
 		topicID = newTopic.MessageThreadID
 	} else {
-		// Топик уже есть -> ПЕРЕОТКРЫВАЕМ
+		// Топик есть -> Пытаемся ПЕРЕОТКРЫТЬ
 		topicID = topic.TopicID
-
-		// Используем метод Telegram API для открытия ветки
-		if err = s.bot.Bot.ReopenForumTopic(ctx, &telego.ReopenForumTopicParams{
+		err = s.bot.Bot.ReopenForumTopic(ctx, &telego.ReopenForumTopicParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topicID,
-		}); err != nil {
+		})
+
+		// ========================================================
+		// ПЕРЕХВАТ ОШИБКИ: Если топик удален администратором
+		// ========================================================
+		if err != nil && (strings.Contains(err.Error(), "message thread not found") || strings.Contains(err.Error(), "thread not found")) {
+			log.Printf("Topic %d not found for reopening. Recreating...", topicID)
+			topicName := fullName
+			if username != "" {
+				topicName = fmt.Sprintf("%s [@%s]", fullName, username)
+			}
+
+			newTopic, errCreate := s.bot.Bot.CreateForumTopic(ctx, &telego.CreateForumTopicParams{
+				ChatID: tu.ID(s.supportGroup),
+				Name:   topicName,
+			})
+			if errCreate != nil {
+				return errCreate
+			}
+			topicID = newTopic.MessageThreadID
+		} else if err != nil {
 			log.Printf("failed to reopen topic %d: %v", topicID, err)
 		}
 	}
 
 	if langCode == "" {
-		langCode = "ru" // по умолчанию
+		langCode = "ru"
 	}
 
-	// =================================================================
-	// СОХРАНЯЕМ В БАЗУ (Общий шаг для обоих сценариев)
-	// UPSERT запрос обновит category_id на новую и поставит is_closed = false
-	// =================================================================
 	if err := s.repo.SaveTopic(ctx, customerID, topicID, categoryID, langCode); err != nil {
 		return err
 	}
 
-	// 1. Уведомляем менеджера в личку
 	groupIDStr := fmt.Sprintf("%d", s.supportGroup)
 	cleanGroupID := strings.TrimPrefix(groupIDStr, "-100")
 	topicLink := fmt.Sprintf("https://t.me/c/%s/%d", cleanGroupID, topicID)
@@ -262,7 +337,6 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 		log.Printf("failed to send message to manager %d: %v", *category.ManagerID, err)
 	}
 
-	// 2. Отправляем системное сообщение в САМ ТОПИК
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topicID,
@@ -272,9 +346,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 		log.Printf("failed to send message to topic %d: %v", topicID, err)
 	}
 
-	// 3. Проверяем рабочие часы и при необходимости шлем автоответ
-	s.notifyOutOfHoursIfNeeded(ctx, customerID, category.WorkHours, category.Timezone)
-
+	s.notifyOutOfHoursIfNeeded(ctx, customerID, category.WorkHours, category.Timezone, langCode)
 	return nil
 }
 
@@ -310,7 +382,7 @@ func isWorkingHours(workHours *string, tz *string) bool {
 }
 
 // notifyOutOfHoursIfNeeded отправляет отбивку, если сейчас нерабочее время (не чаще 1 раза в 30 минут)
-func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerID int64, workHours *string, timezone *string) {
+func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerID int64, workHours *string, timezone *string, langCode string) {
 	if isWorkingHours(workHours, timezone) {
 		return
 	}
@@ -320,23 +392,25 @@ func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerI
 		return
 	}
 
-	msgs, err := s.GetMessages(ctx) // <--- Берем конфиг из БД
+	msgs, err := s.GetMessages(ctx)
 	if err != nil {
 		log.Printf("failed to get messages: %v", err)
 		return
 	}
 
-	// Определяем таймзону для вывода клиенту
 	tz := "UTC"
 	if timezone != nil && *timezone != "" {
 		tz = *timezone
 	}
-
-	// Склеиваем часы и зону в одну строку: "09:00-18:00 (Asia/Dubai)"
 	hoursWithZone := fmt.Sprintf("%s (%s)", *workHours, tz)
 
 	// Подставляем объединенную строку в динамический текст
 	msgText := fmt.Sprintf(msgs.OutOfHours, hoursWithZone)
+
+	// ПЕРЕВОДИМ ТЕКСТ, ЕСЛИ ЯЗЫК КЛИЕНТА ОТЛИЧАЕТСЯ ОТ БАЗОВОГО
+	if langCode != "" && !strings.HasPrefix(langCode, s.managerLang) {
+		msgText = s.llm.Translate(ctx, msgText, langCode)
+	}
 
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    tu.ID(customerID),
@@ -367,4 +441,55 @@ func (s *SupportService) IsManager(ctx context.Context, userID int64) bool {
 
 func (s *SupportService) ToggleTestMode(userID int64) bool {
 	return s.bot.ToggleTestMode(userID)
+}
+
+// GetCustomerID проксирует вызов к репозиторию для получения ID клиента по ID топика
+func (s *SupportService) GetCustomerID(ctx context.Context, topicID int) (int64, error) {
+	return s.repo.GetCustomerID(ctx, topicID)
+}
+
+// CloseTopicByClient закрывает топик по инициативе клиента
+func (s *SupportService) CloseTopicByClient(ctx context.Context, customerID int64) error {
+	topic, err := s.repo.GetCustomerTopic(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	// Если уже закрыт, ничего не делаем
+	if topic.IsClosed {
+		return nil
+	}
+
+	// 1. Закрываем в БД
+	err = s.repo.SetTopicStatus(ctx, topic.TopicID, true)
+	if err != nil {
+		return err
+	}
+
+	// 2. Отправляем уведомление менеджеру прямо в топик
+	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+		ChatID:          tu.ID(s.supportGroup),
+		MessageThreadID: topic.TopicID,
+		Text:            "❌ <b>Обращение завершено клиентом.</b>\nТема закрыта для новых сообщений.",
+		ParseMode:       telego.ModeHTML,
+	}); err != nil {
+		log.Printf("failed to notify manager about client topic closure for topic %d: %v", topic.TopicID, err)
+	}
+
+	// 3. Закрываем сам топик (ветку форума) в Телеграме
+	err = s.bot.Bot.CloseForumTopic(ctx, &telego.CloseForumTopicParams{
+		ChatID:          tu.ID(s.supportGroup),
+		MessageThreadID: topic.TopicID,
+	})
+
+	return err
+}
+
+// SetCustomerLangByTopic находит клиента по топику и меняет ему язык
+func (s *SupportService) SetCustomerLangByTopic(ctx context.Context, topicID int, langCode string) error {
+	customerID, err := s.repo.GetCustomerID(ctx, topicID)
+	if err != nil {
+		return err
+	}
+	return s.repo.UpdateCustomerLang(ctx, customerID, langCode)
 }

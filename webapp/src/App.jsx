@@ -338,6 +338,7 @@ export default function App() {
                             { key: 'AskForText', label: 'Просьба писать текстом', parent: config.Messages },
                             { key: 'TopicCreated', label: 'Успешное создание топика', parent: config.Messages },
                             { key: 'OutOfHours', label: 'Нерабочее время (%s - подстановка часов)', parent: config.Messages },
+                            { key: 'CloseTopicButton', label: 'Текст кнопки завершения диалога', parent: config.Messages }, // <--- НОВОЕ ПОЛЕ
                             { key: 'ServerError', label: 'Ошибка сервера', parent: config.Messages },
                         ].map(({ key, label, parent }) => (
                             <div key={key} className="flex flex-col gap-1">
