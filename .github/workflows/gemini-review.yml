@@ -29,6 +29,7 @@ jobs:
       - name: PR Agent Review
         uses: Codium-ai/pr-agent@main
         env:
+          OPENAI_KEY: ${{ secrets.GEMINI_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
