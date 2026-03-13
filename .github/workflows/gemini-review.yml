@@ -3,6 +3,8 @@ name: Gemini PR Reviewer
 on:
   pull_request:
     types: [opened, synchronize, reopened] # Запускать при открытии и обновлении PR
+  issue_comment:
+    types: [ created, edited ]
 
 permissions:
   contents: read
