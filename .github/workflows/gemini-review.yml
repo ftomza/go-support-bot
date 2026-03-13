@@ -22,6 +22,7 @@ jobs:
         run: |
           echo "INSTRUCTIONS<<EOF" >> $GITHUB_ENV
           cat .github/copilot-instructions.md >> $GITHUB_ENV
+          echo "" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       # Запускаем PR Agent с движком Gemini
