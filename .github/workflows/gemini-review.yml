@@ -1,0 +1,39 @@
+name: Gemini PR Reviewer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened] # Запускать при открытии и обновлении PR
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      # Читаем наш файл с инструкциями и сохраняем его в переменную окружения
+      - name: Load Instructions
+        id: instructions
+        run: |
+          echo "INSTRUCTIONS<<EOF" >> $GITHUB_ENV
+          cat .github/copilot-instructions.md >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      # Запускаем PR Agent с движком Gemini
+      - name: PR Agent Review
+        uses: Codium-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # Указываем, что хотим использовать модель Gemini 2.5 Flash
+          CONFIG.MODEL: "gemini/gemini-2.5-flash"
+          CONFIG.FALLBACK_MODELS: "gemini/gemini-1.5-flash"
+
+          # Передаем наши строгие правила архитектуры
+          PR_REVIEWER.EXTRA_INSTRUCTIONS: ${{ env.INSTRUCTIONS }}
