@@ -41,7 +41,7 @@ type Telegram interface {
 }
 
 type Client struct {
-	Bot Bot
+	Bot *telego.Bot
 
 	roles *roleCache
 }
