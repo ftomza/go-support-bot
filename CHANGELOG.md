@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.6] - 2026-03-14
+
+### Added
+- **Customizable System Texts**: All bot messages and button labels (welcome text, out-of-hours replies, manager notifications) have been extracted from the source code. They are now stored in the database and are fully editable via the React WebApp Admin Panel.
+- **Database-backed State Machine**: User sessions (waiting for name input) and out-of-hours notification throttling are now persisted in a new `customer_sessions` PostgreSQL table. This ensures resilience against bot restarts and paves the way for horizontal scaling.
+- **CI/CD Test Pipeline**: Added a new GitHub Actions workflow (`test.yml`) to automatically run unit tests with race condition detection and code coverage reporting on every push and pull request.
+- **Unit Testing**: Implemented comprehensive unit tests for the core service layer and API endpoints using `testify/mock`, covering complex scenarios like remote topic deletion recovery, navigation logic, and access control.
+
+### Changed
+- **Soft Delete for Categories**: Categories are now soft-deleted (`is_active = false`) instead of permanently dropped when updating the configuration via the WebApp. This preserves the history and data integrity of older, closed customer tickets.
+
+### Security
+- **Admin API Protection**: Hardened the WebApp backend by adding `X-Telegram-Init-Data` signature validation to all `GET` routes (`/api/config/get`, `/api/managers`). This prevents unauthorized access or data leaks of the bot's configuration.
+
 ## [0.0.5] - 2026-03-13
 
 ### Added

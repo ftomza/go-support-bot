@@ -1,0 +1,45 @@
+name: Tests & Coverage
+
+permissions:
+  contents: read
+  
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true # Автоматически кэширует модули для ускорения сборки
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests with Race Detector and Coverage
+        # Флаг -race ищет гонки данных, -coverprofile собирает статистику покрытия
+        run: go test -v -race -coverprofile=coverage.txt ./...
+
+      - name: Print Coverage Summary
+        # Выводит в логи GitHub Actions красивую табличку с процентом покрытия по каждой функции
+        run: go tool cover -func=coverage.txt
+
+      # (Опционально) Загружаем файл покрытия как артефакт, чтобы его можно было скачать
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: coverage.txt
