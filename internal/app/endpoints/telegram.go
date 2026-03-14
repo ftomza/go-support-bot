@@ -26,12 +26,12 @@ import (
 )
 
 type TelegramEndpoints struct {
-	svc        *service.SupportService
+	svc        service.Service
 	devIDs     []int64
 	miniAppURL string
 }
 
-func NewTelegramEndpoints(svc *service.SupportService, devIDs []int64, miniAppURL string) *TelegramEndpoints {
+func NewTelegramEndpoints(svc service.Service, devIDs []int64, miniAppURL string) *TelegramEndpoints {
 	return &TelegramEndpoints{
 		svc:        svc,
 		devIDs:     devIDs,
@@ -393,9 +393,9 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		}
 
 		// Сценарий Б: Это ФИНАЛЬНАЯ ТЕМА (лист) с назначенным менеджером
-		session, exists := e.svc.GetSession(customerID)
+		session, _ := e.svc.GetSession(ctx, customerID)
 		fullName := query.From.FirstName
-		if exists && session.FullName != "" {
+		if session != nil && session.FullName != "" {
 			fullName = session.FullName
 		}
 
@@ -406,7 +406,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			return nil
 		}
 
-		e.svc.ClearSession(customerID)
+		_ = e.svc.ClearSession(ctx, customerID)
 
 		// Удаляем инлайн-меню
 		_ = botCtx.Bot().DeleteMessage(ctx, &telego.DeleteMessageParams{
@@ -493,11 +493,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		}
 
 		// СЦЕНАРИЙ В: Топика НЕТ ВООБЩЕ (новичок)
-		session, exists := e.svc.GetSession(customerID)
+		session, _ := e.svc.GetSession(ctx, customerID)
 		msgs, _ := e.svc.GetMessages(ctx) // Получаем тексты
 
-		if !exists {
-			e.svc.SetWaitingName(customerID)
+		if session != nil {
+			_ = e.svc.SetWaitingName(ctx, customerID)
 			_, err := botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.WelcomeNewUser).WithParseMode(telego.ModeHTML))
 			return err
 		}
@@ -508,7 +508,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.AskForText).WithParseMode(telego.ModeHTML))
 				return nil
 			}
-			e.svc.SaveName(customerID, message.Text)
+			_ = e.svc.SaveName(ctx, customerID, message.Text)
 			// Обновляем локальную переменную, чтобы сразу выдать меню ниже
 			session.FullName = message.Text
 		}

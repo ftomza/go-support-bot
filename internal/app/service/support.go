@@ -17,7 +17,6 @@ import (
 	"html"
 	"log"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -30,24 +29,15 @@ var ErrTopicNotFound = errors.New("topic not found")
 
 const outOfHoursThrottleDuration = 30 * time.Minute
 
-type SessionData struct {
-	WaitingName bool
-	FullName    string
-}
-
 type SupportService struct {
-	repo         *repository.SupportRepo
-	bot          *telegram.Client
-	llm          *llm.GeminiClient
+	repo         repository.Repository
+	bot          telegram.Telegram
+	llm          llm.LLM
 	supportGroup int64
-
-	// FSM (Машина состояний) в памяти: UserID -> bool (ждем ли мы имя)
-	sessions           sync.Map
-	outOfHoursThrottle sync.Map
-	managerLang        string
+	managerLang  string
 }
 
-func NewSupportService(repo *repository.SupportRepo, bot *telegram.Client, llm *llm.GeminiClient, langCode string, groupID int64) *SupportService {
+func NewSupportService(repo repository.Repository, bot telegram.Telegram, llm llm.LLM, langCode string, groupID int64) *SupportService {
 	return &SupportService{
 		repo:         repo,
 		bot:          bot,
@@ -57,25 +47,21 @@ func NewSupportService(repo *repository.SupportRepo, bot *telegram.Client, llm *
 	}
 }
 
-// Управление состоянием FSM
-func (s *SupportService) SetWaitingName(customerID int64) {
-	s.sessions.Store(customerID, SessionData{WaitingName: true})
+// Управление состоянием FSM через БД
+func (s *SupportService) SetWaitingName(ctx context.Context, customerID int64) error {
+	return s.repo.SetWaitingName(ctx, customerID)
 }
 
-func (s *SupportService) SaveName(customerID int64, name string) {
-	s.sessions.Store(customerID, SessionData{WaitingName: false, FullName: name})
+func (s *SupportService) SaveName(ctx context.Context, customerID int64, name string) error {
+	return s.repo.SaveName(ctx, customerID, name)
 }
 
-func (s *SupportService) GetSession(customerID int64) (SessionData, bool) {
-	val, ok := s.sessions.Load(customerID)
-	if !ok {
-		return SessionData{}, false
-	}
-	return val.(SessionData), true
+func (s *SupportService) GetSession(ctx context.Context, customerID int64) (*datastruct.SessionData, error) {
+	return s.repo.GetSession(ctx, customerID)
 }
 
-func (s *SupportService) ClearSession(customerID int64) {
-	s.sessions.Delete(customerID)
+func (s *SupportService) ClearSession(ctx context.Context, customerID int64) error {
+	return s.repo.ClearSession(ctx, customerID)
 }
 
 // HasTopic проверяет, есть ли уже созданный топик для клиента
@@ -114,14 +100,14 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 		if translatedText != msg.Text {
 			finalText = fmt.Sprintf("%s\n\n<i>Оригинал: %s</i>", translatedText, msg.Text)
 		}
-		_, sendErr = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+		_, sendErr = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topic.TopicID,
 			Text:            finalText,
 			ParseMode:       telego.ModeHTML,
 		})
 	} else {
-		_, sendErr = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
+		_, sendErr = s.bot.GetBot().CopyMessage(ctx, &telego.CopyMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			FromChatID:      tu.ID(customerID),
 			MessageID:       msg.MessageID,
@@ -146,7 +132,7 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 		}
 
 		// Создаем новый топик
-		newTopic, err := s.bot.Bot.CreateForumTopic(ctx, &telego.CreateForumTopicParams{
+		newTopic, err := s.bot.GetBot().CreateForumTopic(ctx, &telego.CreateForumTopicParams{
 			ChatID: tu.ID(s.supportGroup),
 			Name:   topicName,
 		})
@@ -168,7 +154,7 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 			safeCategoryName = html.EscapeString(category.Name)
 		}
 
-		_, _ = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+		_, _ = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topic.TopicID,
 			Text:            fmt.Sprintf(msgs.NotifyTopicRecreated, safeCategoryName, html.EscapeString(fullName)),
@@ -181,14 +167,14 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 			if translatedText != msg.Text {
 				finalText = fmt.Sprintf("%s\n\n<i>Оригинал: %s</i>", translatedText, msg.Text)
 			}
-			_, sendErr = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+			_, sendErr = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 				ChatID:          tu.ID(s.supportGroup),
 				MessageThreadID: topic.TopicID,
 				Text:            finalText,
 				ParseMode:       telego.ModeHTML,
 			})
 		} else {
-			_, sendErr = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
+			_, sendErr = s.bot.GetBot().CopyMessage(ctx, &telego.CopyMessageParams{
 				ChatID:          tu.ID(s.supportGroup),
 				FromChatID:      tu.ID(customerID),
 				MessageID:       msg.MessageID,
@@ -238,13 +224,13 @@ func (s *SupportService) HandleManagerMessage(ctx context.Context, msg *telego.M
 	}
 
 	if msg.Text != "" {
-		_, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+		_, err = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 			ChatID:    tu.ID(customerID),
 			Text:      translatedText,
 			ParseMode: telego.ModeHTML,
 		})
 	} else {
-		_, err = s.bot.Bot.CopyMessage(ctx, &telego.CopyMessageParams{
+		_, err = s.bot.GetBot().CopyMessage(ctx, &telego.CopyMessageParams{
 			ChatID:     tu.ID(customerID),
 			FromChatID: tu.ID(s.supportGroup),
 			MessageID:  msg.MessageID,
@@ -276,7 +262,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 		if username != "" {
 			topicName = fmt.Sprintf("%s [@%s]", fullName, username)
 		}
-		newTopic, err := s.bot.Bot.CreateForumTopic(ctx, &telego.CreateForumTopicParams{
+		newTopic, err := s.bot.GetBot().CreateForumTopic(ctx, &telego.CreateForumTopicParams{
 			ChatID: tu.ID(s.supportGroup),
 			Name:   topicName,
 		})
@@ -287,7 +273,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 	} else {
 		// Топик есть -> Пытаемся ПЕРЕОТКРЫТЬ
 		topicID = topic.TopicID
-		err = s.bot.Bot.ReopenForumTopic(ctx, &telego.ReopenForumTopicParams{
+		err = s.bot.GetBot().ReopenForumTopic(ctx, &telego.ReopenForumTopicParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topicID,
 		})
@@ -302,7 +288,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 				topicName = fmt.Sprintf("%s [@%s]", fullName, username)
 			}
 
-			newTopic, errCreate := s.bot.Bot.CreateForumTopic(ctx, &telego.CreateForumTopicParams{
+			newTopic, errCreate := s.bot.GetBot().CreateForumTopic(ctx, &telego.CreateForumTopicParams{
 				ChatID: tu.ID(s.supportGroup),
 				Name:   topicName,
 			})
@@ -331,7 +317,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 	safeCategoryName := html.EscapeString(category.Name)
 
 	msgs, _ := s.GetMessages(ctx)
-	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+	if _, err = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    tu.ID(*category.ManagerID),
 		Text:      fmt.Sprintf(msgs.NotifyManagerNew, safeFullName, safeCategoryName, topicLink),
 		ParseMode: telego.ModeHTML,
@@ -339,7 +325,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 		log.Printf("failed to send message to manager %d: %v", *category.ManagerID, err)
 	}
 
-	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+	if _, err = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topicID,
 		Text:            fmt.Sprintf(msgs.NotifyTopicCreated, safeCategoryName, category.ManagerID),
@@ -389,8 +375,8 @@ func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerI
 		return
 	}
 
-	last, ok := s.outOfHoursThrottle.Load(customerID)
-	if ok && time.Since(last.(time.Time)) < outOfHoursThrottleDuration {
+	session, _ := s.repo.GetSession(ctx, customerID)
+	if session != nil && session.LastThrottle != nil && time.Since(*session.LastThrottle) < outOfHoursThrottleDuration {
 		return
 	}
 
@@ -414,15 +400,15 @@ func (s *SupportService) notifyOutOfHoursIfNeeded(ctx context.Context, customerI
 		msgText = s.llm.Translate(ctx, msgText, langCode)
 	}
 
-	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+	if _, err = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    tu.ID(customerID),
 		Text:      msgText,
 		ParseMode: telego.ModeHTML,
 	}); err != nil {
 		log.Printf("failed to send out of hours message to customer %d: %v", customerID, err)
+	} else {
+		_ = s.repo.UpdateThrottle(ctx, customerID) // Обновляем таймер только при успешной отправке
 	}
-
-	s.outOfHoursThrottle.Store(customerID, time.Now())
 }
 
 func (s *SupportService) GetCustomerTopic(ctx context.Context, id int64) (*datastruct.CustomerTopic, error) {
@@ -470,7 +456,7 @@ func (s *SupportService) CloseTopicByClient(ctx context.Context, customerID int6
 
 	// 2. Отправляем уведомление менеджеру прямо в топик
 	msgs, _ := s.GetMessages(ctx)
-	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
+	if _, err = s.bot.GetBot().SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topic.TopicID,
 		Text:            msgs.NotifyTopicClosedClient,
@@ -480,7 +466,7 @@ func (s *SupportService) CloseTopicByClient(ctx context.Context, customerID int6
 	}
 
 	// 3. Закрываем сам топик (ветку форума) в Телеграме
-	err = s.bot.Bot.CloseForumTopic(ctx, &telego.CloseForumTopicParams{
+	err = s.bot.GetBot().CloseForumTopic(ctx, &telego.CloseForumTopicParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topic.TopicID,
 	})
