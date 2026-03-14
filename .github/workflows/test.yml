@@ -27,7 +27,11 @@ jobs:
           cache: true # Автоматически кэширует модули для ускорения сборки
 
       - name: Install dependencies
-        run: go mod download
+        run: |
+          go mod download
+          mkdir web/dist
+          touch web/dist/index.html
+      
 
       - name: Run tests with Race Detector and Coverage
         # Флаг -race ищет гонки данных, -coverprofile собирает статистику покрытия
