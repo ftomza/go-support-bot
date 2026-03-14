@@ -212,7 +212,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		if !message.IsTopicMessage {
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				"❌ Эту команду нужно использовать внутри ветки (топика) клиента.",
+				"❌ This command must be used within the client's thread (topic).",
 			).WithMessageThreadID(message.MessageThreadID))
 			return nil
 		}
@@ -222,7 +222,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		if len(parts) < 2 {
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				"❌ Пожалуйста, укажите код языка. Пример: <code>/set_lang es</code>",
+				"❌ Please indicate the language code. Example: <code>/set_lang es</code>",
 			).WithParseMode(telego.ModeHTML).WithMessageThreadID(message.MessageThreadID))
 			return nil
 		}
@@ -234,7 +234,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		if err != nil {
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				"❌ Ошибка: не удалось найти клиента для этого топика.",
+				"❌ Error: Unable to find a client for this topic.",
 			).WithMessageThreadID(message.MessageThreadID))
 			return nil
 		}
@@ -254,9 +254,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		err := e.svc.CloseTopic(ctx, topicID)
 		if err == nil {
+			msgs, _ := e.svc.GetMessages(ctx)
+
 			_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 				tu.ID(message.Chat.ID),
-				"✅ Топик закрыт. Обращение клиента переведено в статус решенных.",
+				msgs.NotifyTopicClosedManager,
 			).WithReplyParameters(&telego.ReplyParameters{MessageID: message.MessageID}))
 
 			// Находим клиента и убираем у него клавиатуру
@@ -266,14 +268,13 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			} else {
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
-					"✅ Менеджер завершил диалог. Спасибо за обращение!",
+					msgs.TopicClosedByManager,
 				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
 
-				// Сразу предлагаем меню для новых вопросов
 				kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 				prompt, _ := e.svc.GetMainPrompt(ctx)
 				if prompt == "" {
-					prompt = "Если у вас появятся новые вопросы, выберите тему ниже:"
+					prompt = msgs.PromptNewQuestions
 				}
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
@@ -322,10 +323,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		// Кнопка "В начало"
 		if query.Data == "cat_root" {
+			msgs, _ := e.svc.GetMessages(ctx)
 			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 			prompt, _ := e.svc.GetMainPrompt(ctx)
 			if prompt == "" {
-				prompt = "Выберите тему обращения:"
+				prompt = msgs.SelectTopic
 			}
 
 			// Удаляем старое сообщение
@@ -356,10 +358,11 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		// Сценарий А: Это ПАПКА (промежуточная тема)
 		if category.ManagerID == nil {
+			msgs, _ := e.svc.GetMessages(ctx)
 			kb, _ := e.svc.GetCategoriesKeyboard(ctx, &category.ID)
 			prompt := category.PromptText
 			if prompt == "" {
-				prompt = "Выберите подтему:"
+				prompt = msgs.SelectSubtopic
 			}
 
 			// Удаляем старое меню
@@ -440,17 +443,15 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			if message.Text == msgs.CloseTopicButton {
 				_ = e.svc.CloseTopicByClient(ctx, customerID)
 
-				// Убираем клавиатуру и благодарим
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
-					"✅ Диалог успешно завершен. Спасибо!",
+					msgs.TopicClosedByClient,
 				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
 
-				// Сразу выдаем главное меню
 				catKb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 				prompt, _ := e.svc.GetMainPrompt(ctx)
 				if prompt == "" {
-					prompt = "Вы можете открыть новое обращение, выбрав тему ниже:"
+					prompt = msgs.PromptNewQuestions
 				}
 
 				// Заменяем отправку prompt на html.EscapeString(prompt)
@@ -470,18 +471,17 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		if err == nil && topic.IsClosed {
 			msgs, _ := e.svc.GetMessages(ctx)
 
-			// Защита: если клиент случайно нажал старую кнопку, просто убираем её
 			if message.Text == msgs.CloseTopicButton {
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
-					"Обращение уже было закрыто.",
+					msgs.TopicAlreadyClosed,
 				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
 			}
 
 			kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 			prompt, _ := e.svc.GetMainPrompt(ctx)
 			if prompt == "" {
-				prompt = "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:"
+				prompt = msgs.PromptReturn
 			}
 
 			// Заменяем отправку prompt на html.EscapeString(prompt)
@@ -522,7 +522,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 
 		var finalPrompt string
 		if prompt == "" {
-			finalPrompt = fmt.Sprintf("<b>%s</b>, пожалуйста, воспользуйтесь кнопками меню ниже для выбора темы:", safeName)
+			finalPrompt = fmt.Sprintf("<b>%s</b>, please use the menu buttons below to select a topic:", safeName)
 		} else {
 			finalPrompt = fmt.Sprintf("<b>%s</b>, %s", safeName, prompt)
 		}

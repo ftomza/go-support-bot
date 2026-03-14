@@ -161,8 +161,9 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 		}
 
 		// Уведомляем менеджеров
+		msgs, _ := s.GetMessages(ctx) // <-- Добавить чтение настроек
 		category, _ := s.repo.GetCategoryByID(ctx, topic.CategoryID)
-		safeCategoryName := "Неизвестно"
+		safeCategoryName := "Unknown"
 		if category != nil {
 			safeCategoryName = html.EscapeString(category.Name)
 		}
@@ -170,7 +171,7 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 		_, _ = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 			ChatID:          tu.ID(s.supportGroup),
 			MessageThreadID: topic.TopicID,
-			Text:            fmt.Sprintf("🔄 <b>Обращение пересоздано</b> (старый топик был удален)\nВыбрана тема: %s\nКлиент: %s", safeCategoryName, html.EscapeString(fullName)),
+			Text:            fmt.Sprintf(msgs.NotifyTopicRecreated, safeCategoryName, html.EscapeString(fullName)),
 			ParseMode:       telego.ModeHTML,
 		})
 
@@ -329,9 +330,10 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 	safeFullName := html.EscapeString(fullName)
 	safeCategoryName := html.EscapeString(category.Name)
 
+	msgs, _ := s.GetMessages(ctx)
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:    tu.ID(*category.ManagerID),
-		Text:      fmt.Sprintf("🚨 Новое обращение!\n\n<b>Клиент:</b> %s\n<b>Тема:</b> %s\n\n👉 <a href=\"%s\">Перейти в топик</a>", safeFullName, safeCategoryName, topicLink),
+		Text:      fmt.Sprintf(msgs.NotifyManagerNew, safeFullName, safeCategoryName, topicLink),
 		ParseMode: telego.ModeHTML,
 	}); err != nil {
 		log.Printf("failed to send message to manager %d: %v", *category.ManagerID, err)
@@ -340,7 +342,7 @@ func (s *SupportService) CreateOrReopenTopic(ctx context.Context, customerID int
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topicID,
-		Text:            fmt.Sprintf("🔄 <b>Обращение открыто</b>\nВыбрана тема: %s\nМенеджер: <a href=\"tg://user?id=%d\">Ассистент</a>", safeCategoryName, category.ManagerID),
+		Text:            fmt.Sprintf(msgs.NotifyTopicCreated, safeCategoryName, category.ManagerID),
 		ParseMode:       telego.ModeHTML,
 	}); err != nil {
 		log.Printf("failed to send message to topic %d: %v", topicID, err)
@@ -467,10 +469,11 @@ func (s *SupportService) CloseTopicByClient(ctx context.Context, customerID int6
 	}
 
 	// 2. Отправляем уведомление менеджеру прямо в топик
+	msgs, _ := s.GetMessages(ctx)
 	if _, err = s.bot.Bot.SendMessage(ctx, &telego.SendMessageParams{
 		ChatID:          tu.ID(s.supportGroup),
 		MessageThreadID: topic.TopicID,
-		Text:            "❌ <b>Обращение завершено клиентом.</b>\nТема закрыта для новых сообщений.",
+		Text:            msgs.NotifyTopicClosedClient,
 		ParseMode:       telego.ModeHTML,
 	}); err != nil {
 		log.Printf("failed to notify manager about client topic closure for topic %d: %v", topic.TopicID, err)

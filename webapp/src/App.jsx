@@ -330,29 +330,71 @@ export default function App() {
                 )}
 
                 {activeTab === 'texts' && (
-                    <div className="flex flex-col gap-4">
-                        <h2 className="text-xl font-bold">Системные сообщения</h2>
-                        {[
-                            { key: 'Text', label: 'Главный вопрос (корень)', parent: config },
-                            { key: 'WelcomeNewUser', label: 'Приветствие новичка', parent: config.Messages },
-                            { key: 'AskForText', label: 'Просьба писать текстом', parent: config.Messages },
-                            { key: 'TopicCreated', label: 'Успешное создание топика', parent: config.Messages },
-                            { key: 'OutOfHours', label: 'Нерабочее время (%s - подстановка часов)', parent: config.Messages },
-                            { key: 'CloseTopicButton', label: 'Текст кнопки завершения диалога', parent: config.Messages }, // <--- НОВОЕ ПОЛЕ
-                            { key: 'ServerError', label: 'Ошибка сервера', parent: config.Messages },
-                        ].map(({ key, label, parent }) => (
-                            <div key={key} className="flex flex-col gap-1">
-                                <label className="text-sm font-semibold text-tg-hint">{label}</label>
-                                <textarea
-                                    value={parent[key] || ''}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        setConfig(prev => { const next = {...prev}; if (key === 'Text') next[key] = val; else next.Messages[key] = val; return next; });
-                                    }}
-                                    className="w-full bg-tg-secondaryBg border border-transparent rounded-xl p-3 min-h-[80px] outline-none focus:border-tg-link transition-colors"
-                                />
+                    <div className="flex flex-col gap-6 pb-6">
+
+                        {/* БЛОК 1: ДЛЯ КЛИЕНТОВ */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-xl font-bold mb-4 text-tg-text">Сообщения для клиентов</h2>
+                            <div className="flex flex-col gap-4">
+                                {[
+                                    { key: 'Text', label: 'Главный вопрос в начале', parent: config },
+                                    { key: 'WelcomeNewUser', label: 'Приветствие новичка (спрашиваем имя)', parent: config.Messages },
+                                    { key: 'AskForText', label: 'Если прислали не текст вместо имени', parent: config.Messages },
+                                    { key: 'SelectTopic', label: 'Дефолтный текст меню "Выберите тему"', parent: config.Messages },
+                                    { key: 'SelectSubtopic', label: 'Дефолтный текст меню "Выберите подтему"', parent: config.Messages },
+                                    { key: 'TopicCreated', label: 'Успешное создание обращения', parent: config.Messages },
+                                    { key: 'OutOfHours', label: 'Нерабочее время (%s - подстановка часов)', parent: config.Messages },
+                                    { key: 'TopicClosedByManager', label: 'Топик закрыт менеджером', parent: config.Messages },
+                                    { key: 'TopicClosedByClient', label: 'Топик завершен самим клиентом', parent: config.Messages },
+                                    { key: 'PromptNewQuestions', label: 'Вопрос после закрытия тикета', parent: config.Messages },
+                                    { key: 'PromptReturn', label: 'При возвращении в закрытый топик', parent: config.Messages },
+                                    { key: 'TopicAlreadyClosed', label: 'Ошибка: Обращение уже закрыто', parent: config.Messages },
+                                    { key: 'CloseTopicButton', label: 'Текст на кнопке [Завершить]', parent: config.Messages },
+                                    { key: 'ButtonBack', label: 'Кнопка [Назад]', parent: config.Messages },
+                                    { key: 'ButtonHome', label: 'Кнопка [В начало]', parent: config.Messages },
+                                ].map(({ key, label, parent }) => (
+                                    <div key={key} className="flex flex-col gap-1">
+                                        <label className="text-sm font-semibold text-tg-hint">{label}</label>
+                                        <textarea
+                                            value={parent[key] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setConfig(prev => { const next = {...prev}; if (key === 'Text') next[key] = val; else next.Messages[key] = val; return next; });
+                                            }}
+                                            className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl p-3 min-h-[50px] outline-none focus:border-tg-link transition-colors"
+                                        />
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
+
+                        {/* БЛОК 2: ДЛЯ МЕНЕДЖЕРОВ */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-xl font-bold mb-4 text-tg-text">Уведомления менеджерам</h2>
+                            <div className="flex flex-col gap-4">
+                                {[
+                                    { key: 'NotifyManagerNew', label: 'В ЛС при новом тикете (3 подстановки: Имя, Тема, Ссылка)', parent: config.Messages },
+                                    { key: 'NotifyTopicCreated', label: 'В топик при открытии (2 подстановки: Тема, ID Ассистента)', parent: config.Messages },
+                                    { key: 'NotifyTopicClosedClient', label: 'В топик: клиент сам завершил диалог', parent: config.Messages },
+                                    { key: 'NotifyTopicClosedManager', label: 'В топик: менеджер закрыл тикет', parent: config.Messages },
+                                    { key: 'NotifyTopicRecreated', label: 'В топик при пересоздании удаленного (2 подстановки: Тема, Имя)', parent: config.Messages },
+                                    { key: 'ServerError', label: 'Текст при внутренней ошибке (ServerError)', parent: config.Messages },
+                                ].map(({ key, label, parent }) => (
+                                    <div key={key} className="flex flex-col gap-1">
+                                        <label className="text-sm font-semibold text-tg-hint">{label}</label>
+                                        <textarea
+                                            value={parent[key] || ''}
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                setConfig(prev => { const next = {...prev}; next.Messages[key] = val; return next; });
+                                            }}
+                                            className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl p-3 min-h-[50px] outline-none focus:border-tg-link transition-colors font-mono text-sm"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
                     </div>
                 )}
             </div>

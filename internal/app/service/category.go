@@ -19,6 +19,24 @@ type YamlMessages struct {
 	OutOfHours       string `yaml:"OutOfHours" json:"OutOfHours"`
 	ServerError      string `yaml:"ServerError" json:"ServerError"`
 	CloseTopicButton string `yaml:"CloseTopicButton" json:"CloseTopicButton"`
+
+	// НОВЫЕ ПОЛЯ ДЛЯ КЛИЕНТОВ
+	TopicClosedByManager string `yaml:"TopicClosedByManager" json:"TopicClosedByManager"`
+	TopicClosedByClient  string `yaml:"TopicClosedByClient" json:"TopicClosedByClient"`
+	TopicAlreadyClosed   string `yaml:"TopicAlreadyClosed" json:"TopicAlreadyClosed"`
+	PromptNewQuestions   string `yaml:"PromptNewQuestions" json:"PromptNewQuestions"`
+	PromptReturn         string `yaml:"PromptReturn" json:"PromptReturn"`
+	SelectTopic          string `yaml:"SelectTopic" json:"SelectTopic"`
+	SelectSubtopic       string `yaml:"SelectSubtopic" json:"SelectSubtopic"`
+	ButtonBack           string `yaml:"ButtonBack" json:"ButtonBack"`
+	ButtonHome           string `yaml:"ButtonHome" json:"ButtonHome"`
+
+	// НОВЫЕ ПОЛЯ ДЛЯ МЕНЕДЖЕРОВ
+	NotifyManagerNew         string `yaml:"NotifyManagerNew" json:"NotifyManagerNew"`
+	NotifyTopicCreated       string `yaml:"NotifyTopicCreated" json:"NotifyTopicCreated"`
+	NotifyTopicClosedClient  string `yaml:"NotifyTopicClosedClient" json:"NotifyTopicClosedClient"`
+	NotifyTopicClosedManager string `yaml:"NotifyTopicClosedManager" json:"NotifyTopicClosedManager"`
+	NotifyTopicRecreated     string `yaml:"NotifyTopicRecreated" json:"NotifyTopicRecreated"`
 }
 
 func GetDefaultMessages() YamlMessages {
@@ -29,6 +47,22 @@ func GetDefaultMessages() YamlMessages {
 		OutOfHours:       "🌙 <b>Внимание: нерабочее время</b>\nМенеджеры этой линии сейчас отдыхают. Ваше сообщение сохранено и будет обработано в рабочие часы (<b>%s</b>).",
 		ServerError:      "Ошибка сервера. Попробуйте позже.",
 		CloseTopicButton: "❌ Завершить обращение",
+
+		TopicClosedByManager: "✅ Менеджер завершил диалог. Спасибо за обращение!",
+		TopicClosedByClient:  "✅ Диалог успешно завершен. Спасибо!",
+		TopicAlreadyClosed:   "Обращение уже было закрыто.",
+		PromptNewQuestions:   "Если у вас появятся новые вопросы, выберите тему ниже:",
+		PromptReturn:         "С возвращением! Пожалуйста, выберите тему вашего нового обращения с помощью кнопок:",
+		SelectTopic:          "Выберите тему обращения:",
+		SelectSubtopic:       "Выберите подтему:",
+		ButtonBack:           "🔙 Назад",
+		ButtonHome:           "🏠 В начало",
+
+		NotifyManagerNew:         "🚨 Новое обращение!\n\n<b>Клиент:</b> %s\n<b>Тема:</b> %s\n\n👉 <a href=\"%s\">Перейти в топик</a>",
+		NotifyTopicCreated:       "🔄 <b>Обращение открыто</b>\nВыбрана тема: %s\nМенеджер: <a href=\"tg://user?id=%d\">Ассистент</a>",
+		NotifyTopicClosedClient:  "❌ <b>Обращение завершено клиентом.</b>\nТема закрыта для новых сообщений.",
+		NotifyTopicClosedManager: "✅ Топик закрыт. Обращение клиента переведено в статус решенных.",
+		NotifyTopicRecreated:     "🔄 <b>Обращение пересоздано</b> (старый топик был удален)\nВыбрана тема: %s\nКлиент: %s",
 	}
 }
 
@@ -120,6 +154,49 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 	if cfg.Messages.CloseTopicButton == "" {
 		cfg.Messages.CloseTopicButton = defaults.CloseTopicButton
 	}
+	// Добавьте это сразу после проверки CloseTopicButton
+	if cfg.Messages.TopicClosedByManager == "" {
+		cfg.Messages.TopicClosedByManager = defaults.TopicClosedByManager
+	}
+	if cfg.Messages.TopicClosedByClient == "" {
+		cfg.Messages.TopicClosedByClient = defaults.TopicClosedByClient
+	}
+	if cfg.Messages.TopicAlreadyClosed == "" {
+		cfg.Messages.TopicAlreadyClosed = defaults.TopicAlreadyClosed
+	}
+	if cfg.Messages.PromptNewQuestions == "" {
+		cfg.Messages.PromptNewQuestions = defaults.PromptNewQuestions
+	}
+	if cfg.Messages.PromptReturn == "" {
+		cfg.Messages.PromptReturn = defaults.PromptReturn
+	}
+	if cfg.Messages.SelectTopic == "" {
+		cfg.Messages.SelectTopic = defaults.SelectTopic
+	}
+	if cfg.Messages.SelectSubtopic == "" {
+		cfg.Messages.SelectSubtopic = defaults.SelectSubtopic
+	}
+	if cfg.Messages.ButtonBack == "" {
+		cfg.Messages.ButtonBack = defaults.ButtonBack
+	}
+	if cfg.Messages.ButtonHome == "" {
+		cfg.Messages.ButtonHome = defaults.ButtonHome
+	}
+	if cfg.Messages.NotifyManagerNew == "" {
+		cfg.Messages.NotifyManagerNew = defaults.NotifyManagerNew
+	}
+	if cfg.Messages.NotifyTopicCreated == "" {
+		cfg.Messages.NotifyTopicCreated = defaults.NotifyTopicCreated
+	}
+	if cfg.Messages.NotifyTopicClosedClient == "" {
+		cfg.Messages.NotifyTopicClosedClient = defaults.NotifyTopicClosedClient
+	}
+	if cfg.Messages.NotifyTopicClosedManager == "" {
+		cfg.Messages.NotifyTopicClosedManager = defaults.NotifyTopicClosedManager
+	}
+	if cfg.Messages.NotifyTopicRecreated == "" {
+		cfg.Messages.NotifyTopicRecreated = defaults.NotifyTopicRecreated
+	}
 
 	msgBytes, _ := json.Marshal(cfg.Messages)
 
@@ -205,6 +282,50 @@ func (s *SupportService) GetMessages(ctx context.Context) (YamlMessages, error) 
 		msgs.CloseTopicButton = defaults.CloseTopicButton
 	}
 
+	// Добавьте это сразу после проверки CloseTopicButton
+	if msgs.TopicClosedByManager == "" {
+		msgs.TopicClosedByManager = defaults.TopicClosedByManager
+	}
+	if msgs.TopicClosedByClient == "" {
+		msgs.TopicClosedByClient = defaults.TopicClosedByClient
+	}
+	if msgs.TopicAlreadyClosed == "" {
+		msgs.TopicAlreadyClosed = defaults.TopicAlreadyClosed
+	}
+	if msgs.PromptNewQuestions == "" {
+		msgs.PromptNewQuestions = defaults.PromptNewQuestions
+	}
+	if msgs.PromptReturn == "" {
+		msgs.PromptReturn = defaults.PromptReturn
+	}
+	if msgs.SelectTopic == "" {
+		msgs.SelectTopic = defaults.SelectTopic
+	}
+	if msgs.SelectSubtopic == "" {
+		msgs.SelectSubtopic = defaults.SelectSubtopic
+	}
+	if msgs.ButtonBack == "" {
+		msgs.ButtonBack = defaults.ButtonBack
+	}
+	if msgs.ButtonHome == "" {
+		msgs.ButtonHome = defaults.ButtonHome
+	}
+	if msgs.NotifyManagerNew == "" {
+		msgs.NotifyManagerNew = defaults.NotifyManagerNew
+	}
+	if msgs.NotifyTopicCreated == "" {
+		msgs.NotifyTopicCreated = defaults.NotifyTopicCreated
+	}
+	if msgs.NotifyTopicClosedClient == "" {
+		msgs.NotifyTopicClosedClient = defaults.NotifyTopicClosedClient
+	}
+	if msgs.NotifyTopicClosedManager == "" {
+		msgs.NotifyTopicClosedManager = defaults.NotifyTopicClosedManager
+	}
+	if msgs.NotifyTopicRecreated == "" {
+		msgs.NotifyTopicRecreated = defaults.NotifyTopicRecreated
+	}
+
 	return msgs, nil
 }
 
@@ -227,24 +348,21 @@ func (s *SupportService) GetCategoriesKeyboard(ctx context.Context, parentID *in
 
 	// Если мы находимся внутри подменю, добавляем кнопки навигации
 	if parentID != nil {
+		msgs, _ := s.GetMessages(ctx)
 		currCat, err := s.GetCategoryByID(ctx, *parentID)
 		if err == nil {
 			var navRow []telego.InlineKeyboardButton
 
 			if currCat.ParentID == nil {
-				// Мы на первом уровне вложенности -> возврат в самый корень
-				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🔙 Back", CallbackData: "cat_root"})
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: msgs.ButtonBack, CallbackData: "cat_root"})
 			} else {
-				// Мы глубже 1-го уровня -> возврат на папку выше + кнопка в корень
-				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🔙 Back", CallbackData: fmt.Sprintf("cat_%d", *currCat.ParentID)})
-				navRow = append(navRow, telego.InlineKeyboardButton{Text: "🏠 To Begin", CallbackData: "cat_root"})
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: msgs.ButtonBack, CallbackData: fmt.Sprintf("cat_%d", *currCat.ParentID)})
+				navRow = append(navRow, telego.InlineKeyboardButton{Text: msgs.ButtonHome, CallbackData: "cat_root"})
 			}
-
 			keyboard = append(keyboard, navRow)
 		} else {
-			// Обычный фолбэк на случай непредвиденной ошибки БД
 			keyboard = append(keyboard, []telego.InlineKeyboardButton{
-				{Text: "🔙 В начало", CallbackData: "cat_root"},
+				{Text: msgs.ButtonHome, CallbackData: "cat_root"},
 			})
 		}
 	}
