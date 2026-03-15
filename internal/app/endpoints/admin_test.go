@@ -61,6 +61,6 @@ func TestAPIEndpoints_AuthMiddleware(t *testing.T) {
 
 		// Проверяем, что хакер получил 403 Forbidden
 		assert.Equal(t, http.StatusForbidden, rec.Code)
-		assert.Contains(t, rec.Body.String(), "Invalid init data")
+		assert.Contains(t, rec.Body.String(), "Invalid authentication data")
 	})
 }
