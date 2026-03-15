@@ -44,4 +44,7 @@ type Service interface {
 	GetCustomerID(ctx context.Context, topicID int) (int64, error)
 	CloseTopicByClient(ctx context.Context, customerID int64) error
 	SetCustomerLangByTopic(ctx context.Context, topicID int, langCode string) error
+
+	GetRatingKeyboard(topicID int) *telego.InlineKeyboardMarkup
+	SaveRating(ctx context.Context, customerID int64, topicID int, score int) error
 }

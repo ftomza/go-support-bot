@@ -193,18 +193,19 @@ func (s *SupportService) HandleCustomerMessage(ctx context.Context, msg *telego.
 
 // HandleManagerMessage обрабатывает сообщение от менеджера
 func (s *SupportService) HandleManagerMessage(ctx context.Context, msg *telego.Message) error {
-	if !msg.IsTopicMessage {
+	if !msg.IsTopicMessage || msg.MessageThreadID == 0 {
 		return nil
 	}
-	topicID := msg.MessageThreadID
 
-	// Получаем ID студента по ID топика
-	customerID, err := s.repo.GetCustomerID(ctx, topicID)
+	// 1. Ищем, какому клиенту принадлежит этот топик
+	customerID, err := s.repo.GetCustomerID(ctx, msg.MessageThreadID)
 	if err != nil {
 		return err
 	}
 
-	// Достаем язык клиента из базы
+	// 2. Запоминаем, что именно этот менеджер ведет диалог!
+	_ = s.repo.UpdateActiveManager(ctx, msg.MessageThreadID, msg.From.ID)
+
 	topic, err := s.repo.GetCustomerTopic(ctx, customerID)
 	if err != nil {
 		return err
@@ -481,4 +482,23 @@ func (s *SupportService) SetCustomerLangByTopic(ctx context.Context, topicID int
 		return err
 	}
 	return s.repo.UpdateCustomerLang(ctx, customerID, langCode)
+}
+
+// GetRatingKeyboard генерирует инлайн-кнопки с оценками от 1 до 5
+func (s *SupportService) GetRatingKeyboard(topicID int) *telego.InlineKeyboardMarkup {
+	return &telego.InlineKeyboardMarkup{
+		InlineKeyboard: [][]telego.InlineKeyboardButton{
+			{
+				{Text: "1 ⭐️", CallbackData: fmt.Sprintf("rate_1_%d", topicID)},
+				{Text: "2 ⭐️", CallbackData: fmt.Sprintf("rate_2_%d", topicID)},
+				{Text: "3 ⭐️", CallbackData: fmt.Sprintf("rate_3_%d", topicID)},
+				{Text: "4 ⭐️", CallbackData: fmt.Sprintf("rate_4_%d", topicID)},
+				{Text: "5 ⭐️", CallbackData: fmt.Sprintf("rate_5_%d", topicID)},
+			},
+		},
+	}
+}
+
+func (s *SupportService) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
+	return s.repo.SaveRating(ctx, customerID, topicID, score)
 }

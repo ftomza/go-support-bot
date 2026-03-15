@@ -266,10 +266,17 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			if err != nil {
 				log.Printf("failed to get customer ID for topic %d: %v", topicID, err)
 			} else {
+				// Убираем старую клавиатуру
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
 					msgs.TopicClosedByManager,
 				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
+
+				// Отправляем инлайн-звездочки
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					msgs.RateService,
+				).WithReplyMarkup(e.svc.GetRatingKeyboard(topicID)))
 
 				kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 				prompt, _ := e.svc.GetMainPrompt(ctx)
@@ -427,6 +434,46 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		return nil
 	}, e.svc.IsCustomer())
 
+	// 5. НАЖАТИЕ НА ЗВЕЗДОЧКУ (ОЦЕНКА NPS)
+	bh.HandleCallbackQuery(func(botCtx *th.Context, query telego.CallbackQuery) error {
+		ctx := botCtx.Context()
+		customerID := query.From.ID
+
+		_ = botCtx.Bot().AnswerCallbackQuery(ctx, &telego.AnswerCallbackQueryParams{CallbackQueryID: query.ID})
+
+		// Формат: rate_5_42 (где 5 - оценка, 42 - ID топика)
+		parts := strings.Split(query.Data, "_")
+		if len(parts) == 3 {
+			score, _ := strconv.Atoi(parts[1])
+			topicID, _ := strconv.Atoi(parts[2])
+
+			// Сохраняем в БД как отдельное событие
+			_ = e.svc.SaveRating(ctx, customerID, topicID, score)
+		}
+
+		msgs, _ := e.svc.GetMessages(ctx)
+
+		// Убираем инлайн-звездочки, меняя текст сообщения на "Спасибо!"
+		_, _ = botCtx.Bot().EditMessageText(ctx, &telego.EditMessageTextParams{
+			ChatID:    tu.ID(customerID),
+			MessageID: query.Message.GetMessageID(),
+			Text:      msgs.RatingThanks,
+		})
+
+		// И вот теперь присылаем главное меню для новых вопросов!
+		kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
+		prompt, _ := e.svc.GetMainPrompt(ctx)
+		if prompt == "" {
+			prompt = msgs.PromptNewQuestions
+		}
+		_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+			tu.ID(customerID),
+			html.EscapeString(prompt),
+		).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
+
+		return nil
+	}, th.CallbackDataPrefix("rate_"), e.svc.IsCustomer())
+
 	// 3. ТЕКСТ ОТ КЛИЕНТА
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
 		ctx := botCtx.Context()
@@ -443,10 +490,17 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			if message.Text == msgs.CloseTopicButton {
 				_ = e.svc.CloseTopicByClient(ctx, customerID)
 
+				// Убираем старую клавиатуру
 				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
 					tu.ID(customerID),
 					msgs.TopicClosedByClient,
 				).WithReplyMarkup(&telego.ReplyKeyboardRemove{RemoveKeyboard: true}))
+
+				// Отправляем инлайн-звездочки
+				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
+					tu.ID(customerID),
+					msgs.RateService,
+				).WithReplyMarkup(e.svc.GetRatingKeyboard(topic.TopicID)))
 
 				catKb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
 				prompt, _ := e.svc.GetMainPrompt(ctx)

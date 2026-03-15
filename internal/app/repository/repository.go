@@ -20,12 +20,14 @@ type Repository interface {
 	GetAllCategoriesFull(ctx context.Context) ([]datastruct.Category, error)
 	GetCategoriesByParent(ctx context.Context, parentID *int) ([]datastruct.Category, error)
 	GetCategoryByID(ctx context.Context, id int) (*datastruct.Category, error)
+	SaveRating(ctx context.Context, customerID int64, topicID int, score int) error
 
 	GetCustomerTopic(ctx context.Context, customerID int64) (*datastruct.CustomerTopic, error)
 	SaveTopic(ctx context.Context, customerID int64, topicID int, categoryID int, langCode string) error
 	GetCustomerID(ctx context.Context, topicID int) (int64, error)
 	SetTopicStatus(ctx context.Context, topicID int, isClosed bool) error
 	UpdateCustomerLang(ctx context.Context, customerID int64, langCode string) error
+	UpdateActiveManager(ctx context.Context, topicID int, managerID int64) error
 
 	GetSession(ctx context.Context, customerID int64) (*datastruct.SessionData, error)
 	SetWaitingName(ctx context.Context, customerID int64) error

@@ -46,3 +46,8 @@ func (r *SupportRepo) UpdateCustomerLang(ctx context.Context, customerID int64, 
 	_, err := r.db.Exec(ctx, "UPDATE customer_topics SET lang_code = $1 WHERE customer_id = $2", langCode, customerID)
 	return err
 }
+
+func (r *SupportRepo) UpdateActiveManager(ctx context.Context, topicID int, managerID int64) error {
+	_, err := r.db.Exec(ctx, "UPDATE customer_topics SET active_manager_id = $1 WHERE topic_id = $2", managerID, topicID)
+	return err
+}

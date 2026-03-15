@@ -125,3 +125,17 @@ func (r *SupportRepo) GetCategoryByID(ctx context.Context, id int) (*datastruct.
 		Scan(&c.ID, &c.ParentID, &c.Name, &c.PromptText, &c.ManagerID, &c.WorkHours, &c.Timezone, &c.Image)
 	return &c, err
 }
+
+func (r *SupportRepo) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO topic_ratings (customer_id, topic_id, score, manager_id) 
+		VALUES ($1, $2, $3, (
+			SELECT COALESCE(ct.active_manager_id, c.manager_id)
+			FROM customer_topics ct 
+			JOIN categories c ON ct.category_id = c.id 
+			WHERE ct.topic_id = $2 
+			LIMIT 1
+		))`,
+		customerID, topicID, score)
+	return err
+}
