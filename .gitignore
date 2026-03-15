@@ -29,6 +29,7 @@ go.work.sum
 config/local.yaml
 config/prod.yaml
 config/dev.yaml
+bin
 
 # Editor/IDE
 # .idea/

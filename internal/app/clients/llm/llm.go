@@ -16,6 +16,11 @@ import (
 	"google.golang.org/api/option"
 )
 
+type LLM interface {
+	Translate(ctx context.Context, text, targetLang string) string
+	Close()
+}
+
 type GeminiClient struct {
 	client          *genai.Client
 	model           *genai.GenerativeModel
@@ -60,5 +65,5 @@ func (g *GeminiClient) Translate(ctx context.Context, text, targetLang string) s
 }
 
 func (g *GeminiClient) Close() {
-	g.client.Close()
+	_ = g.client.Close()
 }

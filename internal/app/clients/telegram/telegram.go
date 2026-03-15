@@ -16,6 +16,30 @@ import (
 	tu "github.com/mymmrac/telego/telegoutil"
 )
 
+type Bot interface {
+	GetChatMember(ctx context.Context, params *telego.GetChatMemberParams) (telego.ChatMember, error)
+	GetChatAdministrators(ctx context.Context, params *telego.GetChatAdministratorsParams) ([]telego.ChatMember, error)
+	SendMessage(ctx context.Context, params *telego.SendMessageParams) (*telego.Message, error)
+	SendPhoto(ctx context.Context, params *telego.SendPhotoParams) (*telego.Message, error)
+	DeleteMessage(ctx context.Context, params *telego.DeleteMessageParams) error
+	AnswerCallbackQuery(ctx context.Context, params *telego.AnswerCallbackQueryParams) error
+	GetFile(ctx context.Context, params *telego.GetFileParams) (*telego.File, error)
+	CloseForumTopic(ctx context.Context, params *telego.CloseForumTopicParams) error
+	CreateForumTopic(ctx context.Context, params *telego.CreateForumTopicParams) (*telego.ForumTopic, error)
+	ReopenForumTopic(ctx context.Context, params *telego.ReopenForumTopicParams) error
+	CopyMessage(ctx context.Context, params *telego.CopyMessageParams) (*telego.MessageID, error)
+	Token() string
+}
+
+type Telegram interface {
+	IsCustomer(supportGroup int64) th.Predicate
+	IsManager(ctx context.Context, supportGroup int64, userID int64) bool
+	ToggleTestMode(userID int64) bool
+	ClearCache()
+	GetChatAdministrators(ctx context.Context, chatID int64) ([]telego.ChatMember, error)
+	GetBot() Bot
+}
+
 type Client struct {
 	Bot *telego.Bot
 
@@ -44,6 +68,10 @@ func NewTelegramBot(token string) (*Client, error) {
 			testMode:  make(map[int64]bool),
 		},
 	}, nil
+}
+
+func (c *Client) GetBot() Bot {
+	return c.Bot
 }
 
 func (c *Client) IsCustomer(supportGroup int64) th.Predicate {

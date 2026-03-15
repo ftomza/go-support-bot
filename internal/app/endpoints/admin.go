@@ -10,6 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go-support-bot/internal/app/clients/telegram"
 	"html"
 	"io"
 	"io/fs"
@@ -25,13 +26,13 @@ import (
 )
 
 type APIEndpoints struct {
-	svc    *service.SupportService
-	bot    *telego.Bot
+	svc    service.Service
+	bot    telegram.Bot
 	devIDs []int64
 }
 
 // Теперь принимаем экземпляр бота и массив разработчиков
-func NewAPIEndpoints(svc *service.SupportService, bot *telego.Bot, devIDs []int64) *APIEndpoints {
+func NewAPIEndpoints(svc service.Service, bot telegram.Bot, devIDs []int64) *APIEndpoints {
 	return &APIEndpoints{
 		svc:    svc,
 		bot:    bot,
@@ -101,11 +102,11 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 	})
 
 	// ==========================================
-	// ОБОРАЧИВАЕМ API ЭНДПОИНТЫ ЧЕРЕЗ api.wrap
+	// ОБОРАЧИВАЕМ API ЭНДПОИНТЫ ЧЕРЕЗ api.wrap(api.auth(...))
 	// ==========================================
 
 	// Отдаем текущую конфигурацию в формате JSON
-	mux.HandleFunc("/api/config/get", api.wrap(func(w http.ResponseWriter, r *http.Request) error {
+	mux.HandleFunc("/api/config/get", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
 		cfg, err := api.svc.ExportConfig(r.Context())
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -113,26 +114,16 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(w).Encode(cfg)
-	}))
+	})))
 
 	// Сохраняем новую конфигурацию из WebApp
-	mux.HandleFunc("/api/config/save", api.wrap(func(w http.ResponseWriter, r *http.Request) error {
+	mux.HandleFunc("/api/config/save", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			return fmt.Errorf("invalid method: %s", r.Method)
 		}
 
-		// 1. ПРОВЕРКА БЕЗОПАСНОСТИ
-		initData := r.Header.Get("X-Telegram-Init-Data")
-		if initData == "" {
-			http.Error(w, "Missing init data", http.StatusUnauthorized)
-			return fmt.Errorf("missing init data")
-		}
-
-		if _, err := telegoutil.ValidateWebAppData(api.bot.Token(), initData); err != nil {
-			http.Error(w, "Invalid init data: Hacker detected!", http.StatusForbidden)
-			return fmt.Errorf("invalid webapp init data: %w", err)
-		}
+		// (Проверка безопасности X-Telegram-Init-Data теперь работает в middleware api.auth)
 
 		// 2. Читаем сырой JSON от фронтенда и логгируем его
 		bodyBytes, err := io.ReadAll(r.Body)
@@ -161,10 +152,10 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		w.WriteHeader(http.StatusOK)
 		_, err = w.Write([]byte(`{"status":"ok"}`))
 		return err
-	}))
+	})))
 
 	// Отдаем список менеджеров
-	mux.HandleFunc("/api/managers", api.wrap(func(w http.ResponseWriter, r *http.Request) error {
+	mux.HandleFunc("/api/managers", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
 		managers, err := api.svc.GetManagersData(r.Context())
 		if err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -172,5 +163,23 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(w).Encode(managers)
-	}))
+	})))
+}
+
+// auth — это Middleware для проверки подлинности запроса от Telegram WebApp
+func (api *APIEndpoints) auth(next apiHandler) apiHandler {
+	return func(w http.ResponseWriter, r *http.Request) error {
+		initData := r.Header.Get("X-Telegram-Init-Data")
+		if initData == "" {
+			http.Error(w, "Unauthorized: Missing init data", http.StatusUnauthorized)
+			return fmt.Errorf("missing init data in request to %s", r.URL.Path)
+		}
+
+		if _, err := telegoutil.ValidateWebAppData(api.bot.Token(), initData); err != nil {
+			http.Error(w, "Forbidden: Invalid authentication data", http.StatusForbidden)
+			return fmt.Errorf("invalid webapp init data: %w", err)
+		}
+
+		return next(w, r)
+	}
 }

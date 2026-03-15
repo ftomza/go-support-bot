@@ -19,8 +19,8 @@ func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt stri
 	}
 	defer tx.Rollback(ctx)
 
-	// Очищаем старые категории
-	if _, err = tx.Exec(ctx, "DELETE FROM categories"); err != nil {
+	// МЯГКОЕ УДАЛЕНИЕ: помечаем все старые категории как неактивные вместо их физического удаления
+	if _, err = tx.Exec(ctx, "UPDATE categories SET is_active = false"); err != nil {
 		return err
 	}
 
@@ -35,6 +35,7 @@ func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt stri
 	var insertNode func(parentID *int, node *datastruct.CategoryNode) error
 	insertNode = func(parentID *int, node *datastruct.CategoryNode) error {
 		var id int
+		// Флаг is_active по умолчанию станет TRUE благодаря БД
 		err := tx.QueryRow(ctx, `
 			INSERT INTO categories (parent_id, name, prompt_text, manager_id, work_hours, timezone, image) 
 			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
@@ -73,7 +74,8 @@ func (r *SupportRepo) GetMainPrompt(ctx context.Context) (string, error) {
 
 // GetAllCategoriesFull выгружает всё дерево для экспорта в YAML
 func (r *SupportRepo) GetAllCategoriesFull(ctx context.Context) ([]datastruct.Category, error) {
-	rows, err := r.db.Query(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories ORDER BY id")
+	// ДОБАВЛЕН ФИЛЬТР WHERE is_active = true
+	rows, err := r.db.Query(ctx, "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE is_active = true ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +93,12 @@ func (r *SupportRepo) GetAllCategoriesFull(ctx context.Context) ([]datastruct.Ca
 }
 
 func (r *SupportRepo) GetCategoriesByParent(ctx context.Context, parentID *int) ([]datastruct.Category, error) {
-	query := "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id IS NULL ORDER BY id"
+	// ДОБАВЛЕН ФИЛЬТР is_active = true В ОБА ЗАПРОСА
+	query := "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id IS NULL AND is_active = true ORDER BY id"
 	args := []any{}
 
 	if parentID != nil {
-		query = "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id = $1 ORDER BY id"
+		query = "SELECT id, parent_id, name, prompt_text, manager_id, work_hours, timezone, image FROM categories WHERE parent_id = $1 AND is_active = true ORDER BY id"
 		args = append(args, *parentID)
 	}
 

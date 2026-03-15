@@ -157,14 +157,29 @@ export default function App() {
 
     const fetchData = async () => {
         try {
-            const [configRes, managersRes] = await Promise.all([ fetch('/api/config/get'), fetch('/api/managers') ]);
+            // Формируем заголовки с подписью Telegram
+            const headers = {
+                'X-Telegram-Init-Data': tg?.initData || ''
+            };
+
+            // Отправляем заголовки вместе с GET-запросами
+            const [configRes, managersRes] = await Promise.all([
+                fetch('/api/config/get', { headers }),
+                fetch('/api/managers', { headers })
+            ]);
+
+            if (!configRes.ok || !managersRes.ok) {
+                throw new Error('Ошибка авторизации или сервера');
+            }
+
             const configData = await configRes.json();
             const managersData = await managersRes.json();
+
             if (!configData.Themes) configData.Themes = {};
             setConfig(configData);
             setManagers(managersData || []);
         } catch (err) {
-            tg?.showAlert('Ошибка загрузки данных');
+            tg?.showAlert('Ошибка загрузки данных: ' + err.message);
         } finally {
             setLoading(false);
         }

@@ -20,7 +20,6 @@ func (s *SupportService) GetManagersList(ctx context.Context) (string, error) {
 	}
 
 	var sb strings.Builder
-	// Используем HTML-теги вместо звездочек
 	sb.WriteString("📋 <b>Список менеджеров (администраторов группы):</b>\n\n")
 
 	for _, admin := range admins {
@@ -48,14 +47,12 @@ func (s *SupportService) GetManagersList(ctx context.Context) (string, error) {
 	return sb.String(), nil
 }
 
-// Добавь структуру для JSON
 type ManagerData struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	Username string `json:"username,omitempty"`
 }
 
-// Добавь метод для выгрузки в API
 func (s *SupportService) GetManagersData(ctx context.Context) ([]ManagerData, error) {
 	admins, err := s.bot.GetChatAdministrators(ctx, s.supportGroup)
 	if err != nil {

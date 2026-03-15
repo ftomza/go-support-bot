@@ -1,0 +1,38 @@
+template: testify
+packages:
+  "go-support-bot/internal/app/clients/llm":
+    config:
+      filename: "mock_{{.InterfaceName}}.go"
+      pkgname: "mocks"
+      structname: "Mock{{.InterfaceName}}"
+      dir: "internal/app/clients/mocks"
+    interfaces:
+      LLM:
+
+  "go-support-bot/internal/app/clients/telegram":
+    config:
+      filename: "mock_{{.InterfaceName}}.go"
+      pkgname: "mocks"
+      structname: "Mock{{.InterfaceName}}"
+      dir: "internal/app/clients/mocks"
+    interfaces:
+      Telegram:
+      Bot:
+
+  "go-support-bot/internal/app/repository":
+    config:
+      filename: "mock_{{.InterfaceName}}.go"
+      pkgname: "mocks"
+      structname: "Mock{{.InterfaceName}}"
+      dir: "internal/app/repository/mocks"
+    interfaces:
+      Repository:
+
+  "go-support-bot/internal/app/service":
+    config:
+      filename: "mock_{{.InterfaceName}}.go"
+      pkgname: "mocks"
+      structname: "Mock{{.InterfaceName}}"
+      dir: "internal/app/service/mocks"
+    interfaces:
+      Service:
