@@ -176,7 +176,7 @@ func (api *APIEndpoints) auth(next apiHandler) apiHandler {
 		}
 
 		if _, err := telegoutil.ValidateWebAppData(api.bot.Token(), initData); err != nil {
-			http.Error(w, "Forbidden: Invalid init data (Hacker detected!)", http.StatusForbidden)
+			http.Error(w, "Forbidden: Invalid authentication data", http.StatusForbidden)
 			return fmt.Errorf("invalid webapp init data: %w", err)
 		}
 

@@ -35,11 +35,13 @@ jobs:
 
       - name: Run tests with Race Detector and Coverage
         # Флаг -race ищет гонки данных, -coverprofile собирает статистику покрытия
-        run: go test -v -race -coverprofile=coverage.txt ./...
+        run: go test -v -race -coverprofile=coverage.txt.tmp ./...
 
       - name: Print Coverage Summary
         # Выводит в логи GitHub Actions красивую табличку с процентом покрытия по каждой функции
-        run: go tool cover -func=coverage.txt
+        run: | 
+          grep -vE "${{ env.GO_COVER_EXCLUDE }}" coverage.txt.tmp > coverage.txt
+          go tool cover -func=coverage.txt
 
       # (Опционально) Загружаем файл покрытия как артефакт, чтобы его можно было скачать
       - name: Upload coverage report
