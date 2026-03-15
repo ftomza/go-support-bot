@@ -40,7 +40,7 @@ jobs:
       - name: Print Coverage Summary
         # Выводит в логи GitHub Actions красивую табличку с процентом покрытия по каждой функции
         run: | 
-          grep -vE "${{ GO_COVER_EXCLUDE }}" coverage.txt.tmp > coverage.txt
+          grep -vE "${{ vars.GO_COVER_EXCLUDE }}" coverage.txt.tmp > coverage.txt
           go tool cover -func=coverage.txt
 
       # (Опционально) Загружаем файл покрытия как артефакт, чтобы его можно было скачать
