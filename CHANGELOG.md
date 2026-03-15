@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2026-03-15
+
+### Added
+- **NPS (Net Promoter Score) System**: Introduced a customer satisfaction rating feature. Upon ticket closure (either by the client or manager), the bot now prompts the user to rate the support quality from 1 to 5 stars using an inline keyboard.
+- **Event-Driven Rating Analytics**: Ratings are now stored in a dedicated, append-only `topic_ratings` PostgreSQL table. This architectural choice prevents data overwriting and allows for historical NPS analytics and time-series reporting.
+- **Dynamic Manager Attribution**: Added an `active_manager_id` tracker to `customer_topics`. The bot now smartly detects which specific manager last replied to the customer in the Telegram group. When a rating is given, it is accurately attributed to the actual assisting manager rather than the default category owner (using SQL `COALESCE`).
+- **Customizable NPS Texts**: Added `RateService` and `RatingThanks` text fields to the database configuration, making the rating prompts fully editable via the WebApp Admin Panel.
+- **NPS Unit Tests**: Expanded the test suite in `support_test.go` to cover inline keyboard generation, rating persistence, and the dynamic manager reassignment logic.
+
 ## [0.0.6] - 2026-03-14
 
 ### Added

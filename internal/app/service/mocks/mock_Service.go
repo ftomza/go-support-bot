@@ -962,6 +962,59 @@ func (_c *MockService_GetMessages_Call) RunAndReturn(run func(ctx context.Contex
 	return _c
 }
 
+// GetRatingKeyboard provides a mock function for the type MockService
+func (_mock *MockService) GetRatingKeyboard(topicID int) *telego.InlineKeyboardMarkup {
+	ret := _mock.Called(topicID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRatingKeyboard")
+	}
+
+	var r0 *telego.InlineKeyboardMarkup
+	if returnFunc, ok := ret.Get(0).(func(int) *telego.InlineKeyboardMarkup); ok {
+		r0 = returnFunc(topicID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*telego.InlineKeyboardMarkup)
+		}
+	}
+	return r0
+}
+
+// MockService_GetRatingKeyboard_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRatingKeyboard'
+type MockService_GetRatingKeyboard_Call struct {
+	*mock.Call
+}
+
+// GetRatingKeyboard is a helper method to define mock.On call
+//   - topicID int
+func (_e *MockService_Expecter) GetRatingKeyboard(topicID interface{}) *MockService_GetRatingKeyboard_Call {
+	return &MockService_GetRatingKeyboard_Call{Call: _e.mock.On("GetRatingKeyboard", topicID)}
+}
+
+func (_c *MockService_GetRatingKeyboard_Call) Run(run func(topicID int)) *MockService_GetRatingKeyboard_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 int
+		if args[0] != nil {
+			arg0 = args[0].(int)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_GetRatingKeyboard_Call) Return(inlineKeyboardMarkup *telego.InlineKeyboardMarkup) *MockService_GetRatingKeyboard_Call {
+	_c.Call.Return(inlineKeyboardMarkup)
+	return _c
+}
+
+func (_c *MockService_GetRatingKeyboard_Call) RunAndReturn(run func(topicID int) *telego.InlineKeyboardMarkup) *MockService_GetRatingKeyboard_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetSession provides a mock function for the type MockService
 func (_mock *MockService) GetSession(ctx context.Context, customerID int64) (*datastruct.SessionData, error) {
 	ret := _mock.Called(ctx, customerID)
@@ -1477,6 +1530,75 @@ func (_c *MockService_SaveName_Call) Return(err error) *MockService_SaveName_Cal
 }
 
 func (_c *MockService_SaveName_Call) RunAndReturn(run func(ctx context.Context, customerID int64, name string) error) *MockService_SaveName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SaveRating provides a mock function for the type MockService
+func (_mock *MockService) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
+	ret := _mock.Called(ctx, customerID, topicID, score)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveRating")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int, int) error); ok {
+		r0 = returnFunc(ctx, customerID, topicID, score)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_SaveRating_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveRating'
+type MockService_SaveRating_Call struct {
+	*mock.Call
+}
+
+// SaveRating is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - topicID int
+//   - score int
+func (_e *MockService_Expecter) SaveRating(ctx interface{}, customerID interface{}, topicID interface{}, score interface{}) *MockService_SaveRating_Call {
+	return &MockService_SaveRating_Call{Call: _e.mock.On("SaveRating", ctx, customerID, topicID, score)}
+}
+
+func (_c *MockService_SaveRating_Call) Run(run func(ctx context.Context, customerID int64, topicID int, score int)) *MockService_SaveRating_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_SaveRating_Call) Return(err error) *MockService_SaveRating_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_SaveRating_Call) RunAndReturn(run func(ctx context.Context, customerID int64, topicID int, score int) error) *MockService_SaveRating_Call {
 	_c.Call.Return(run)
 	return _c
 }

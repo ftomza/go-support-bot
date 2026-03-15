@@ -44,6 +44,7 @@ func TestSupportService_HandleManagerMessage(t *testing.T) {
 		ctx := context.Background()
 		topicID := 42
 		customerID := int64(999)
+		managerID := int64(777)
 		originalText := "Привет, мы решаем вашу проблему"
 		translatedText := "Hello, we are solving your problem"
 
@@ -55,10 +56,12 @@ func TestSupportService_HandleManagerMessage(t *testing.T) {
 			Chat: telego.Chat{
 				ID: supportGroupID,
 			},
+			From: &telego.User{ID: managerID},
 		}
 
 		// Прописываем ожидания (что должен вызвать наш сервис)
 		mockRepo.EXPECT().GetCustomerID(ctx, topicID).Return(customerID, nil)
+		mockRepo.EXPECT().UpdateActiveManager(ctx, topicID, msg.From.ID).Return(nil)
 		mockRepo.EXPECT().GetCustomerTopic(ctx, customerID).Return(&datastruct.CustomerTopic{
 			TopicID:  topicID,
 			LangCode: "en", // Язык клиента отличается от языка менеджера
@@ -496,5 +499,98 @@ func TestSupportService_notifyOutOfHoursIfNeeded(t *testing.T) {
 		mockRepo.EXPECT().UpdateThrottle(ctx, customerID).Return(nil)
 
 		svc.notifyOutOfHoursIfNeeded(ctx, customerID, &workHours, &tz, clientLang)
+	})
+}
+
+func TestSupportService_NPS(t *testing.T) {
+	// =====================================================================
+	// Тест 1: Проверка генерации клавиатуры (5 звезд и правильный callback)
+	// =====================================================================
+	t.Run("GetRatingKeyboard generates correct buttons", func(t *testing.T) {
+		// Для генерации кнопок нам не нужны моки БД и Телеграма
+		svc := NewSupportService(nil, nil, nil, "ru", 0)
+		topicID := 42
+
+		kb := svc.GetRatingKeyboard(topicID)
+
+		assert.NotNil(t, kb)
+		assert.Len(t, kb.InlineKeyboard, 1)    // 1 ряд кнопок
+		assert.Len(t, kb.InlineKeyboard[0], 5) // 5 кнопок в ряду
+
+		// Проверяем первую и последнюю кнопки
+		assert.Equal(t, "1 ⭐️", kb.InlineKeyboard[0][0].Text)
+		assert.Equal(t, "rate_1_42", kb.InlineKeyboard[0][0].CallbackData)
+
+		assert.Equal(t, "5 ⭐️", kb.InlineKeyboard[0][4].Text)
+		assert.Equal(t, "rate_5_42", kb.InlineKeyboard[0][4].CallbackData)
+	})
+
+	// =====================================================================
+	// Тест 2: Сохранение оценки уходит в репозиторий
+	// =====================================================================
+	t.Run("SaveRating calls repository", func(t *testing.T) {
+		mockRepo := repoMocks.NewMockRepository(t)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		ctx := context.Background()
+
+		customerID := int64(123)
+		topicID := 42
+		score := 5
+
+		// Ожидаем, что сервис просто передаст данные в БД
+		mockRepo.EXPECT().SaveRating(ctx, customerID, topicID, score).Return(nil)
+
+		err := svc.SaveRating(ctx, customerID, topicID, score)
+		assert.NoError(t, err)
+	})
+}
+
+func TestSupportService_HandleManagerMessage_ReassignManager(t *testing.T) {
+	// =====================================================================
+	// Тест 3: Бот должен запомнить, кто из менеджеров последним ответил клиенту
+	// =====================================================================
+	t.Run("Updates active manager ID on reply", func(t *testing.T) {
+		mockRepo := repoMocks.NewMockRepository(t)
+		mockLLM := clientsMocks.NewMockLLM(t)
+		mockBot := clientsMocks.NewMockBot(t)
+		mockTg := clientsMocks.NewMockTelegram(t)
+
+		mockTg.EXPECT().GetBot().Return(mockBot)
+
+		supportGroupID := int64(-100123456)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", supportGroupID)
+
+		ctx := context.Background()
+		topicID := 42
+		customerID := int64(999)
+		managerID := int64(777) // ID Васи, который отвечает прямо сейчас
+
+		msg := &telego.Message{
+			IsTopicMessage:  true,
+			MessageThreadID: topicID,
+			Text:            "Я проверил, всё работает!",
+			Chat:            telego.Chat{ID: supportGroupID},
+			From:            &telego.User{ID: managerID}, // Сообщение от Васи
+		}
+
+		// 1. Бот понимает, что это топик клиента 999
+		mockRepo.EXPECT().GetCustomerID(ctx, topicID).Return(customerID, nil)
+
+		// 2. БОТ ОБЯЗАН ОБНОВИТЬ АКТИВНОГО МЕНЕДЖЕРА В БАЗЕ! (Это то, что мы тестируем)
+		mockRepo.EXPECT().UpdateActiveManager(ctx, topicID, managerID).Return(nil)
+
+		// 3. Дальше идет стандартная логика получения топика и отправки...
+		mockRepo.EXPECT().GetCustomerTopic(ctx, customerID).Return(&datastruct.CustomerTopic{
+			TopicID:  topicID,
+			LangCode: "ru",
+		}, nil)
+
+		// Отправка клиенту
+		mockBot.EXPECT().SendMessage(ctx, mock.MatchedBy(func(params *telego.SendMessageParams) bool {
+			return params.ChatID.ID == customerID
+		})).Return(&telego.Message{}, nil)
+
+		err := svc.HandleManagerMessage(ctx, msg)
+		assert.NoError(t, err)
 	})
 }
