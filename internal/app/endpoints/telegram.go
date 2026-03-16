@@ -550,7 +550,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		session, _ := e.svc.GetSession(ctx, customerID)
 		msgs, _ := e.svc.GetMessages(ctx) // Получаем тексты
 
-		if session != nil {
+		if session == nil {
 			_ = e.svc.SetWaitingName(ctx, customerID)
 			_, err := botCtx.Bot().SendMessage(ctx, tu.Message(tu.ID(message.Chat.ID), msgs.WelcomeNewUser).WithParseMode(telego.ModeHTML))
 			return err
