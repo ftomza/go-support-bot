@@ -164,6 +164,78 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(w).Encode(managers)
 	})))
+
+	// Получение списка клиентов (с поддержкой поиска ?search=...)
+	mux.HandleFunc("/api/customers", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		search := r.URL.Query().Get("search")
+		profiles, err := api.svc.GetCustomerProfiles(r.Context(), search)
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/json")
+		return json.NewEncoder(w).Encode(profiles)
+	})))
+
+	// Получение истории рассылок
+	mux.HandleFunc("/api/broadcasts/history", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		broadcasts, err := api.svc.GetBroadcasts(r.Context())
+		if err != nil {
+			return err
+		}
+		w.Header().Set("Content-Type", "application/json")
+		return json.NewEncoder(w).Encode(broadcasts)
+	})))
+
+	// Создание новой рассылки
+	mux.HandleFunc("/api/broadcasts/create", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return nil
+		}
+
+		var req struct {
+			Text        string  `json:"text"`
+			CustomerIDs []int64 `json:"customer_ids"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return err
+		}
+
+		_, err := api.svc.CreateBroadcast(r.Context(), req.Text, req.CustomerIDs)
+		if err != nil {
+			return err
+		}
+
+		// Здесь мы позже добавим триггер для воркера, чтобы он сразу начал отправку
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+		return nil
+	})))
+
+	// Повторная отправка по ошибкам (Retry)
+	mux.HandleFunc("/api/broadcasts/retry", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return nil
+		}
+
+		var req struct {
+			BroadcastID int `json:"broadcast_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return err
+		}
+
+		if err := api.svc.RetryBroadcast(r.Context(), req.BroadcastID); err != nil {
+			return err
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+		return nil
+	})))
 }
 
 // auth — это Middleware для проверки подлинности запроса от Telegram WebApp

@@ -96,8 +96,10 @@ func main() {
 
 	// 4. Собираем слои
 	repo := repository.NewSupportRepo(dbPool)
-	svc := service.NewSupportService(repo, clientBot, clientLLM, cfg.LLM.ManagerLang, cfg.Telegram.SupportGroupID)
+	svc := service.NewSupportService(repo, clientBot, clientLLM, cfg.LLM.ManagerLang, cfg.Telegram.SupportGroupID, cfg.Telegram.DeveloperIDs)
 	eps := endpoints.NewTelegramEndpoints(svc, cfg.Telegram.DeveloperIDs, cfg.Telegram.MiniAppURL)
+
+	svc.StartBroadcastWorker(ctx)
 
 	// ==========================================================
 	// Выбор режима работы: Webhooks или Long Polling

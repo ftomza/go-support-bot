@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown, Users, Send, Search, RotateCcw, AlertCircle } from 'lucide-react';
 
 const tg = window.Telegram?.WebApp;
 
@@ -54,7 +54,6 @@ const ThemeNode = ({ name, node, path, onChange, onDelete, onAddSub, onMove, isF
                         />
                     </div>
 
-                    {/* НОВОЕ ПОЛЕ */}
                     <div className="flex flex-col gap-1">
                         <label className="text-xs text-tg-hint font-semibold">Картинка (URL)</label>
                         <input
@@ -136,8 +135,16 @@ export default function App() {
     const configRef = useRef(null);
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('themes');
+    const [activeTab, setActiveTab] = useState('themes'); // themes, texts, broadcasts
     const [promptModal, setPromptModal] = useState({ isOpen: false, path: null, value: '' });
+
+    // Состояния для вкладки Рассылок
+    const [customers, setCustomers] = useState([]);
+    const [broadcastHistory, setBroadcastHistory] = useState([]);
+    const [selectedCustomers, setSelectedCustomers] = useState(new Set());
+    const [broadcastText, setBroadcastText] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [isSending, setIsSending] = useState(false);
 
     useEffect(() => { configRef.current = config; }, [config]);
 
@@ -151,26 +158,33 @@ export default function App() {
         fetchData();
     }, []);
 
+    // Управляем видимостью главной кнопки Telegram
     useEffect(() => {
-        if (config && tg) tg.MainButton.show();
-    }, [config]);
+        if (tg) {
+            if (activeTab === 'broadcasts') {
+                tg.MainButton.hide(); // Скрываем кнопку сохранения на вкладке рассылок
+            } else if (config) {
+                tg.MainButton.show();
+            }
+        }
+    }, [activeTab, config]);
+
+    // Загрузка данных для вкладки Рассылок
+    useEffect(() => {
+        if (activeTab === 'broadcasts') {
+            fetchBroadcastData();
+        }
+    }, [activeTab]);
 
     const fetchData = async () => {
         try {
-            // Формируем заголовки с подписью Telegram
-            const headers = {
-                'X-Telegram-Init-Data': tg?.initData || ''
-            };
-
-            // Отправляем заголовки вместе с GET-запросами
+            const headers = { 'X-Telegram-Init-Data': tg?.initData || '' };
             const [configRes, managersRes] = await Promise.all([
                 fetch('/api/config/get', { headers }),
                 fetch('/api/managers', { headers })
             ]);
 
-            if (!configRes.ok || !managersRes.ok) {
-                throw new Error('Ошибка авторизации или сервера');
-            }
+            if (!configRes.ok || !managersRes.ok) throw new Error('Ошибка авторизации или сервера');
 
             const configData = await configRes.json();
             const managersData = await managersRes.json();
@@ -182,6 +196,21 @@ export default function App() {
             tg?.showAlert('Ошибка загрузки данных: ' + err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBroadcastData = async (search = '') => {
+        try {
+            const headers = { 'X-Telegram-Init-Data': tg?.initData || '' };
+            const [custRes, histRes] = await Promise.all([
+                fetch(`/api/customers?search=${encodeURIComponent(search)}`, { headers }),
+                fetch(`/api/broadcasts/history`, { headers })
+            ]);
+
+            if (custRes.ok) setCustomers(await custRes.json() || []);
+            if (histRes.ok) setBroadcastHistory(await histRes.json() || []);
+        } catch (err) {
+            console.error('Ошибка загрузки данных рассылки:', err);
         }
     };
 
@@ -204,6 +233,73 @@ export default function App() {
             tg?.MainButton.hideProgress();
         }
     };
+
+    // --- Обработчики для Рассылок ---
+    const toggleCustomer = (id) => {
+        setSelectedCustomers(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleAllVisible = () => {
+        const validCustomers = customers.filter(c => !c.is_blocked);
+        if (selectedCustomers.size === validCustomers.length) {
+            setSelectedCustomers(new Set()); // Снять все
+        } else {
+            setSelectedCustomers(new Set(validCustomers.map(c => c.customer_id))); // Выбрать всех доступных
+        }
+    };
+
+    const handleSendBroadcast = async () => {
+        if (!broadcastText.trim()) return tg?.showAlert('Введите текст рассылки');
+        if (selectedCustomers.size === 0) return tg?.showAlert('Выберите получателей');
+
+        if (!window.confirm(`Запустить рассылку для ${selectedCustomers.size} пользователей?`)) return;
+
+        setIsSending(true);
+        try {
+            const res = await fetch('/api/broadcasts/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                body: JSON.stringify({
+                    text: broadcastText,
+                    customer_ids: Array.from(selectedCustomers)
+                })
+            });
+            if (!res.ok) throw new Error('Ошибка сервера');
+
+            tg?.showAlert('Рассылка успешно добавлена в очередь!');
+            setBroadcastText('');
+            setSelectedCustomers(new Set());
+            fetchBroadcastData(searchQuery); // Обновляем историю
+        } catch (err) {
+            tg?.showAlert('Ошибка при запуске рассылки: ' + err.message);
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    const handleRetryBroadcast = async (broadcastId) => {
+        if (!window.confirm('Повторить отправку всем, кому сообщение не дошло?')) return;
+
+        try {
+            const res = await fetch('/api/broadcasts/retry', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                body: JSON.stringify({ broadcast_id: broadcastId })
+            });
+            if (!res.ok) throw new Error('Ошибка сервера');
+
+            tg?.showAlert('Сообщения с ошибками возвращены в очередь!');
+            fetchBroadcastData(searchQuery);
+        } catch (err) {
+            tg?.showAlert('Ошибка: ' + err.message);
+        }
+    };
+    // --------------------------------
 
     const updateTree = (path, field, value, oldName = null) => {
         setConfig(prev => {
@@ -320,9 +416,10 @@ export default function App() {
                 </div>
             )}
 
-            <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10">
+            <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10 shadow-sm">
                 <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'themes' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('themes')}><Settings size={18}/> Темы</button>
                 <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('texts')}><MessageSquare size={18}/> Тексты</button>
+                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'broadcasts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('broadcasts')}><Users size={18}/> Рассылка</button>
             </div>
 
             <div className="px-4">
@@ -346,8 +443,6 @@ export default function App() {
 
                 {activeTab === 'texts' && (
                     <div className="flex flex-col gap-6 pb-6">
-
-                        {/* БЛОК 1: ДЛЯ КЛИЕНТОВ */}
                         <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
                             <h2 className="text-xl font-bold mb-4 text-tg-text">Сообщения для клиентов</h2>
                             <div className="flex flex-col gap-4">
@@ -359,6 +454,8 @@ export default function App() {
                                     { key: 'SelectSubtopic', label: 'Дефолтный текст меню "Выберите подтему"', parent: config.Messages },
                                     { key: 'TopicCreated', label: 'Успешное создание обращения', parent: config.Messages },
                                     { key: 'OutOfHours', label: 'Нерабочее время (%s - подстановка часов)', parent: config.Messages },
+                                    { key: 'RateService', label: 'Просьба оценить качество (NPS)', parent: config.Messages },
+                                    { key: 'RatingThanks', label: 'Ответ после оценки NPS', parent: config.Messages },
                                     { key: 'TopicClosedByManager', label: 'Топик закрыт менеджером', parent: config.Messages },
                                     { key: 'TopicClosedByClient', label: 'Топик завершен самим клиентом', parent: config.Messages },
                                     { key: 'PromptNewQuestions', label: 'Вопрос после закрытия тикета', parent: config.Messages },
@@ -367,8 +464,6 @@ export default function App() {
                                     { key: 'CloseTopicButton', label: 'Текст на кнопке [Завершить]', parent: config.Messages },
                                     { key: 'ButtonBack', label: 'Кнопка [Назад]', parent: config.Messages },
                                     { key: 'ButtonHome', label: 'Кнопка [В начало]', parent: config.Messages },
-                                    { key: 'RateService', label: 'Вопрос об оценке', parent: config.Messages },
-                                    { key: 'RatingThanks', label: 'Благодарность об оценке', parent: config.Messages },
                                 ].map(({ key, label, parent }) => (
                                     <div key={key} className="flex flex-col gap-1">
                                         <label className="text-sm font-semibold text-tg-hint">{label}</label>
@@ -385,17 +480,16 @@ export default function App() {
                             </div>
                         </div>
 
-                        {/* БЛОК 2: ДЛЯ МЕНЕДЖЕРОВ */}
                         <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
                             <h2 className="text-xl font-bold mb-4 text-tg-text">Уведомления менеджерам</h2>
                             <div className="flex flex-col gap-4">
                                 {[
-                                    { key: 'NotifyManagerNew', label: 'В ЛС при новом тикете (3 подстановки: Имя, Тема, Ссылка)', parent: config.Messages },
-                                    { key: 'NotifyTopicCreated', label: 'В топик при открытии (2 подстановки: Тема, ID Ассистента)', parent: config.Messages },
-                                    { key: 'NotifyTopicClosedClient', label: 'В топик: клиент сам завершил диалог', parent: config.Messages },
-                                    { key: 'NotifyTopicClosedManager', label: 'В топик: менеджер закрыл тикет', parent: config.Messages },
-                                    { key: 'NotifyTopicRecreated', label: 'В топик при пересоздании удаленного (2 подстановки: Тема, Имя)', parent: config.Messages },
-                                    { key: 'ServerError', label: 'Текст при внутренней ошибке (ServerError)', parent: config.Messages },
+                                    { key: 'NotifyManagerNew', label: 'В ЛС при новом тикете', parent: config.Messages },
+                                    { key: 'NotifyTopicCreated', label: 'В топик при открытии', parent: config.Messages },
+                                    { key: 'NotifyTopicClosedClient', label: 'В топик: клиент сам завершил', parent: config.Messages },
+                                    { key: 'NotifyTopicClosedManager', label: 'В топик: менеджер закрыл', parent: config.Messages },
+                                    { key: 'NotifyTopicRecreated', label: 'В топик при пересоздании', parent: config.Messages },
+                                    { key: 'ServerError', label: 'Текст при внутренней ошибке', parent: config.Messages },
                                 ].map(({ key, label, parent }) => (
                                     <div key={key} className="flex flex-col gap-1">
                                         <label className="text-sm font-semibold text-tg-hint">{label}</label>
@@ -411,12 +505,141 @@ export default function App() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'broadcasts' && (
+                    <div className="flex flex-col gap-6 pb-6">
+
+                        {/* Создание рассылки */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-xl font-bold mb-4 text-tg-text flex items-center gap-2">
+                                <Send size={20}/> Новое сообщение
+                            </h2>
+
+                            {/* Поиск и список клиентов */}
+                            <div className="mb-4">
+                                <div className="flex gap-2 mb-3">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-2.5 text-tg-hint" size={18} />
+                                        <input
+                                            type="text"
+                                            placeholder="Поиск по имени или ID..."
+                                            value={searchQuery}
+                                            onChange={(e) => {
+                                                setSearchQuery(e.target.value);
+                                                fetchBroadcastData(e.target.value);
+                                            }}
+                                            className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl py-2 pl-10 pr-3 outline-none focus:border-tg-link transition-colors"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="border border-tg-hint/30 rounded-xl overflow-hidden bg-tg-bg">
+                                    <div className="flex items-center justify-between p-3 border-b border-tg-hint/30 bg-tg-secondaryBg">
+                                        <label className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedCustomers.size > 0 && selectedCustomers.size === customers.filter(c => !c.is_blocked).length}
+                                                onChange={toggleAllVisible}
+                                                className="w-4 h-4 rounded"
+                                            />
+                                            Выбрать всех ({customers.filter(c => !c.is_blocked).length})
+                                        </label>
+                                        <span className="text-xs text-tg-hint">Выбрано: {selectedCustomers.size}</span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto p-2">
+                                        {customers.length === 0 ? (
+                                            <div className="text-center text-tg-hint text-sm py-4">Клиенты не найдены</div>
+                                        ) : (
+                                            customers.map(c => (
+                                                <label key={c.customer_id} className={`flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-tg-secondaryBg transition-colors ${c.is_blocked ? 'opacity-50' : ''}`}>
+                                                    <div className="flex items-center gap-3">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedCustomers.has(c.customer_id)}
+                                                            onChange={() => toggleCustomer(c.customer_id)}
+                                                            disabled={c.is_blocked}
+                                                            className="w-4 h-4 rounded"
+                                                        />
+                                                        <span className="text-sm font-medium">{c.full_name || `ID: ${c.customer_id}`}</span>
+                                                    </div>
+                                                    {c.is_blocked && <AlertCircle size={16} className="text-red-500" title="Бот заблокирован" />}
+                                                </label>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Текст рассылки */}
+                            <div className="flex flex-col gap-2 mb-4">
+                                <label className="text-sm font-semibold text-tg-hint">Текст сообщения (поддерживается HTML)</label>
+                                <textarea
+                                    placeholder="<b>Внимание акция!</b> Приходите к нам..."
+                                    value={broadcastText}
+                                    onChange={(e) => setBroadcastText(e.target.value)}
+                                    className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl p-3 min-h-[100px] outline-none focus:border-tg-link transition-colors"
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleSendBroadcast}
+                                disabled={isSending || selectedCustomers.size === 0 || !broadcastText.trim()}
+                                className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow flex items-center justify-center gap-2 disabled:opacity-50 transition-opacity"
+                            >
+                                <Send size={18}/> {isSending ? 'Запуск...' : 'Запустить рассылку'}
+                            </button>
+                        </div>
+
+                        {/* История рассылок */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-xl font-bold mb-4 text-tg-text flex items-center justify-between">
+                                История рассылок
+                                <button onClick={() => fetchBroadcastData(searchQuery)} className="text-tg-button text-sm font-normal hover:underline">Обновить</button>
+                            </h2>
+
+                            <div className="flex flex-col gap-3">
+                                {broadcastHistory.length === 0 ? (
+                                    <div className="text-center text-tg-hint py-4">История пуста</div>
+                                ) : (
+                                    broadcastHistory.map(b => (
+                                        <div key={b.id} className="bg-tg-bg border border-tg-hint/30 rounded-xl p-3 flex flex-col gap-2">
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-xs text-tg-hint font-mono">{new Date(b.created_at).toLocaleString()}</span>
+                                                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${b.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    {b.status === 'completed' ? 'Завершено' : 'В процессе'}
+                                                </span>
+                                            </div>
+
+                                            <p className="text-sm line-clamp-2 break-words" title={b.text}>{b.text}</p>
+
+                                            <div className="flex items-center gap-3 mt-1 pt-2 border-t border-tg-hint/10 text-xs font-medium">
+                                                <span className="text-tg-text">Всего: {b.total}</span>
+                                                <span className="text-green-500">✓ {b.sent}</span>
+                                                {b.pending > 0 && <span className="text-blue-500">⏳ {b.pending}</span>}
+                                                {b.failed > 0 && <span className="text-red-500">❌ {b.failed}</span>}
+                                            </div>
+
+                                            {b.failed > 0 && b.status === 'completed' && (
+                                                <button
+                                                    onClick={() => handleRetryBroadcast(b.id)}
+                                                    className="mt-2 text-xs flex items-center justify-center gap-1 bg-red-50 text-red-600 py-1.5 rounded-lg border border-red-200 hover:bg-red-100 transition-colors"
+                                                >
+                                                    <RotateCcw size={14}/> Повторить отправку для ошибок ({b.failed})
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
 
                     </div>
                 )}
             </div>
 
-            {!tg?.initData && (
+            {!tg?.initData && activeTab !== 'broadcasts' && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-tg-bg border-t border-tg-hint/30">
                     <button onClick={saveConfig} className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow-lg">Сохранить (Dev)</button>
                 </div>

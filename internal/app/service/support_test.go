@@ -39,7 +39,7 @@ func TestSupportService_HandleManagerMessage(t *testing.T) {
 
 		managerLang := "ru"
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, managerLang, supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, managerLang, supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		topicID := 42
@@ -92,7 +92,7 @@ func TestSupportService_HandleManagerMessage(t *testing.T) {
 		mockTg := clientsMocks.NewMockTelegram(t)
 		// Нам не нужно мокать Bot, так как до него не должно дойти
 
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", -100123456)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", -100123456, []int64{16})
 
 		msg := &telego.Message{
 			IsTopicMessage: false, // Сообщение в общий чат
@@ -123,7 +123,7 @@ func TestSupportService_HandleCustomerMessage(t *testing.T) {
 
 		supportGroupID := int64(-100123456)
 		managerLang := "ru"
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, managerLang, supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, managerLang, supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(111)
@@ -169,7 +169,7 @@ func TestSupportService_HandleCustomerMessage(t *testing.T) {
 		mockTg.EXPECT().GetBot().Return(mockBot)
 
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(222)
@@ -245,7 +245,7 @@ func TestSupportService_CloseTopicByClient(t *testing.T) {
 		mockTg.EXPECT().GetBot().Return(mockBot)
 
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(333)
@@ -285,7 +285,7 @@ func TestSupportService_CloseTopicByClient(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
 		// Мы даже не создаем мок бота, потому что логика не должна дойти до работы с Telegram API
 
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(333)
@@ -314,7 +314,7 @@ func TestSupportService_CreateOrReopenTopic(t *testing.T) {
 		mockTg.EXPECT().GetBot().Return(mockBot)
 
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(123)
@@ -369,7 +369,7 @@ func TestSupportService_CreateOrReopenTopic(t *testing.T) {
 		mockTg.EXPECT().GetBot().Return(mockBot)
 
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, nil, "ru", supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(123)
@@ -428,7 +428,7 @@ func TestSupportService_notifyOutOfHoursIfNeeded(t *testing.T) {
 	t.Run("24/7 no notification", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
 		// Бота и LLM не мокаем, так как до них не должно дойти
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 
 		// Передаем nil в workHours, что означает 24/7
 		svc.notifyOutOfHoursIfNeeded(context.Background(), 123, nil, nil, "ru")
@@ -441,7 +441,7 @@ func TestSupportService_notifyOutOfHoursIfNeeded(t *testing.T) {
 	// =====================================================================
 	t.Run("Throttled notification", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(123)
@@ -468,7 +468,7 @@ func TestSupportService_notifyOutOfHoursIfNeeded(t *testing.T) {
 		mockLLM := clientsMocks.NewMockLLM(t)
 
 		mockTg.EXPECT().GetBot().Return(mockBot)
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", 0)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", 0, []int64{16})
 
 		ctx := context.Background()
 		customerID := int64(123)
@@ -508,7 +508,7 @@ func TestSupportService_NPS(t *testing.T) {
 	// =====================================================================
 	t.Run("GetRatingKeyboard generates correct buttons", func(t *testing.T) {
 		// Для генерации кнопок нам не нужны моки БД и Телеграма
-		svc := NewSupportService(nil, nil, nil, "ru", 0)
+		svc := NewSupportService(nil, nil, nil, "ru", 0, []int64{16})
 		topicID := 42
 
 		kb := svc.GetRatingKeyboard(topicID)
@@ -530,7 +530,7 @@ func TestSupportService_NPS(t *testing.T) {
 	// =====================================================================
 	t.Run("SaveRating calls repository", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		customerID := int64(123)
@@ -558,7 +558,7 @@ func TestSupportService_HandleManagerMessage_ReassignManager(t *testing.T) {
 		mockTg.EXPECT().GetBot().Return(mockBot)
 
 		supportGroupID := int64(-100123456)
-		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", supportGroupID)
+		svc := NewSupportService(mockRepo, mockTg, mockLLM, "ru", supportGroupID, []int64{16})
 
 		ctx := context.Background()
 		topicID := 42

@@ -35,15 +35,24 @@ type SupportService struct {
 	llm          llm.LLM
 	supportGroup int64
 	managerLang  string
+	developerIDs []int64
 }
 
-func NewSupportService(repo repository.Repository, bot telegram.Telegram, llm llm.LLM, langCode string, groupID int64) *SupportService {
+func NewSupportService(
+	repo repository.Repository,
+	bot telegram.Telegram,
+	llm llm.LLM,
+	langCode string,
+	groupID int64,
+	developerIDs []int64,
+) *SupportService {
 	return &SupportService{
 		repo:         repo,
 		bot:          bot,
 		supportGroup: groupID,
 		llm:          llm,
 		managerLang:  langCode,
+		developerIDs: developerIDs,
 	}
 }
 

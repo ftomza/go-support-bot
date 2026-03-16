@@ -34,6 +34,16 @@ type Repository interface {
 	SaveName(ctx context.Context, customerID int64, name string) error
 	ClearSession(ctx context.Context, customerID int64) error
 	UpdateThrottle(ctx context.Context, customerID int64) error
+
+	GetCustomerProfiles(ctx context.Context, search string) ([]datastruct.CustomerProfile, error)
+	CreateBroadcast(ctx context.Context, text string, customerIDs []int64) (int, error)
+	GetBroadcasts(ctx context.Context) ([]datastruct.Broadcast, error)
+	RetryBroadcast(ctx context.Context, broadcastID int) error
+	GetPendingBroadcastTasks(ctx context.Context, limit int) ([]datastruct.BroadcastTask, error)
+	UpdateBroadcastRecipientStatus(ctx context.Context, recipientID int, status string, errText *string) error
+	MarkCustomerAsBlocked(ctx context.Context, customerID int64) error
+	CheckAndCompleteBroadcast(ctx context.Context, broadcastID int) error
+	SaveCustomer(ctx context.Context, id int64, fullName string, username string) error
 }
 
 type SupportRepo struct {

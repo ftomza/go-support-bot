@@ -252,7 +252,22 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 		ctx := botCtx.Context()
 		topicID := message.MessageThreadID
 
-		err := e.svc.CloseTopic(ctx, topicID)
+		// =====================================================================
+		// Проверяем, не закрыл ли клиент топик сам секунду назад
+		// =====================================================================
+		customerID, err := e.svc.GetCustomerID(ctx, topicID)
+		if err == nil {
+			topic, err := e.svc.GetCustomerTopic(ctx, customerID)
+			// Если топик УЖЕ закрыт в базе, значит клиент нажал кнопку "Завершить",
+			// и бот уже отправил ему NPS. Мы просто игнорируем это сервисное сообщение.
+			if err == nil && topic.IsClosed {
+				return nil
+			}
+		}
+		// =====================================================================
+
+		// Если мы дошли сюда, значит топик закрыл именно менеджер руками в Телеграме
+		err = e.svc.CloseTopic(ctx, topicID)
 		if err == nil {
 			msgs, _ := e.svc.GetMessages(ctx)
 
@@ -277,16 +292,6 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 					tu.ID(customerID),
 					msgs.RateService,
 				).WithReplyMarkup(e.svc.GetRatingKeyboard(topicID)))
-
-				kb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
-				prompt, _ := e.svc.GetMainPrompt(ctx)
-				if prompt == "" {
-					prompt = msgs.PromptNewQuestions
-				}
-				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
-					tu.ID(customerID),
-					html.EscapeString(prompt),
-				).WithReplyMarkup(kb).WithParseMode(telego.ModeHTML))
 			}
 		}
 		return err
@@ -432,7 +437,7 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 			WithReplyMarkup(kb))
 
 		return nil
-	}, e.svc.IsCustomer())
+	}, th.CallbackDataPrefix("cat_"), e.svc.IsCustomer())
 
 	// 5. НАЖАТИЕ НА ЗВЕЗДОЧКУ (ОЦЕНКА NPS)
 	bh.HandleCallbackQuery(func(botCtx *th.Context, query telego.CallbackQuery) error {
@@ -477,8 +482,16 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 	// 3. ТЕКСТ ОТ КЛИЕНТА
 	bh.HandleMessage(func(botCtx *th.Context, message telego.Message) error {
 		ctx := botCtx.Context()
-		customerID := message.From.ID
+		customerID := message.Chat.ID
 
+		// Получаем имя клиента (учитываем, что фамилия или username могут быть пустыми)
+		fullName := message.From.FirstName
+		if message.From.LastName != "" {
+			fullName += " " + message.From.LastName
+		}
+
+		// 1. СОХРАНЯЕМ ИЛИ ОБНОВЛЯЕМ ПРОФИЛЬ КЛИЕНТА В БД
+		_ = e.svc.SaveCustomer(ctx, customerID, fullName, message.From.Username)
 		// Проверяем, есть ли топик в базе
 		topic, err := e.svc.GetCustomerTopic(ctx, customerID)
 
@@ -501,18 +514,6 @@ func (e *TelegramEndpoints) Register(bh *th.BotHandler) {
 					tu.ID(customerID),
 					msgs.RateService,
 				).WithReplyMarkup(e.svc.GetRatingKeyboard(topic.TopicID)))
-
-				catKb, _ := e.svc.GetCategoriesKeyboard(ctx, nil)
-				prompt, _ := e.svc.GetMainPrompt(ctx)
-				if prompt == "" {
-					prompt = msgs.PromptNewQuestions
-				}
-
-				// Заменяем отправку prompt на html.EscapeString(prompt)
-				_, _ = botCtx.Bot().SendMessage(ctx, tu.Message(
-					tu.ID(customerID),
-					html.EscapeString(prompt),
-				).WithReplyMarkup(catKb).WithParseMode(telego.ModeHTML))
 
 				return nil
 			}

@@ -9,9 +9,11 @@ package service
 import (
 	"context"
 	"go-support-bot/internal/app/datastruct"
+	"log"
 
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
+	tu "github.com/mymmrac/telego/telegoutil"
 )
 
 type Service interface {
@@ -44,7 +46,27 @@ type Service interface {
 	GetCustomerID(ctx context.Context, topicID int) (int64, error)
 	CloseTopicByClient(ctx context.Context, customerID int64) error
 	SetCustomerLangByTopic(ctx context.Context, topicID int, langCode string) error
+	SaveCustomer(ctx context.Context, customerID int64, fullName, username string) error
 
 	GetRatingKeyboard(topicID int) *telego.InlineKeyboardMarkup
 	SaveRating(ctx context.Context, customerID int64, topicID int, score int) error
+
+	GetCustomerProfiles(ctx context.Context, search string) ([]datastruct.CustomerProfile, error)
+	CreateBroadcast(ctx context.Context, text string, customerIDs []int64) (int, error)
+	GetBroadcasts(ctx context.Context) ([]datastruct.Broadcast, error)
+	RetryBroadcast(ctx context.Context, broadcastID int) error
+	StartBroadcastWorker(ctx context.Context)
+}
+
+func (s *SupportService) NotifyDevelopers(ctx context.Context, text string) {
+	for _, devID := range s.developerIDs {
+		_, err := s.bot.GetBot().SendMessage(ctx, tu.Message(
+			tu.ID(devID),
+			text,
+		).WithParseMode(telego.ModeHTML))
+
+		if err != nil {
+			log.Printf("Не удалось отправить алерт разработчику %d: %v", devID, err)
+		}
+	}
 }
