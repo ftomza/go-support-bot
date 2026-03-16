@@ -245,6 +245,78 @@ func (_c *MockService_CloseTopicByClient_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// CreateBroadcast provides a mock function for the type MockService
+func (_mock *MockService) CreateBroadcast(ctx context.Context, text string, customerIDs []int64) (int, error) {
+	ret := _mock.Called(ctx, text, customerIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBroadcast")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []int64) (int, error)); ok {
+		return returnFunc(ctx, text, customerIDs)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []int64) int); ok {
+		r0 = returnFunc(ctx, text, customerIDs)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []int64) error); ok {
+		r1 = returnFunc(ctx, text, customerIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_CreateBroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBroadcast'
+type MockService_CreateBroadcast_Call struct {
+	*mock.Call
+}
+
+// CreateBroadcast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - text string
+//   - customerIDs []int64
+func (_e *MockService_Expecter) CreateBroadcast(ctx interface{}, text interface{}, customerIDs interface{}) *MockService_CreateBroadcast_Call {
+	return &MockService_CreateBroadcast_Call{Call: _e.mock.On("CreateBroadcast", ctx, text, customerIDs)}
+}
+
+func (_c *MockService_CreateBroadcast_Call) Run(run func(ctx context.Context, text string, customerIDs []int64)) *MockService_CreateBroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []int64
+		if args[2] != nil {
+			arg2 = args[2].([]int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_CreateBroadcast_Call) Return(n int, err error) *MockService_CreateBroadcast_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockService_CreateBroadcast_Call) RunAndReturn(run func(ctx context.Context, text string, customerIDs []int64) (int, error)) *MockService_CreateBroadcast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateOrReopenTopic provides a mock function for the type MockService
 func (_mock *MockService) CreateOrReopenTopic(ctx context.Context, customerID int64, username string, fullName string, categoryID int, langCode string) error {
 	ret := _mock.Called(ctx, customerID, username, fullName, categoryID, langCode)
@@ -450,6 +522,68 @@ func (_c *MockService_ExportConfig_Call) RunAndReturn(run func(ctx context.Conte
 	return _c
 }
 
+// GetBroadcasts provides a mock function for the type MockService
+func (_mock *MockService) GetBroadcasts(ctx context.Context) ([]datastruct.Broadcast, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBroadcasts")
+	}
+
+	var r0 []datastruct.Broadcast
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]datastruct.Broadcast, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []datastruct.Broadcast); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]datastruct.Broadcast)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_GetBroadcasts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBroadcasts'
+type MockService_GetBroadcasts_Call struct {
+	*mock.Call
+}
+
+// GetBroadcasts is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockService_Expecter) GetBroadcasts(ctx interface{}) *MockService_GetBroadcasts_Call {
+	return &MockService_GetBroadcasts_Call{Call: _e.mock.On("GetBroadcasts", ctx)}
+}
+
+func (_c *MockService_GetBroadcasts_Call) Run(run func(ctx context.Context)) *MockService_GetBroadcasts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_GetBroadcasts_Call) Return(broadcasts []datastruct.Broadcast, err error) *MockService_GetBroadcasts_Call {
+	_c.Call.Return(broadcasts, err)
+	return _c
+}
+
+func (_c *MockService_GetBroadcasts_Call) RunAndReturn(run func(ctx context.Context) ([]datastruct.Broadcast, error)) *MockService_GetBroadcasts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCategoriesKeyboard provides a mock function for the type MockService
 func (_mock *MockService) GetCategoriesKeyboard(ctx context.Context, parentID *int) (*telego.InlineKeyboardMarkup, error) {
 	ret := _mock.Called(ctx, parentID)
@@ -648,6 +782,74 @@ func (_c *MockService_GetCustomerID_Call) Return(n int64, err error) *MockServic
 }
 
 func (_c *MockService_GetCustomerID_Call) RunAndReturn(run func(ctx context.Context, topicID int) (int64, error)) *MockService_GetCustomerID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCustomerProfiles provides a mock function for the type MockService
+func (_mock *MockService) GetCustomerProfiles(ctx context.Context, search string) ([]datastruct.CustomerProfile, error) {
+	ret := _mock.Called(ctx, search)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCustomerProfiles")
+	}
+
+	var r0 []datastruct.CustomerProfile
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]datastruct.CustomerProfile, error)); ok {
+		return returnFunc(ctx, search)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []datastruct.CustomerProfile); ok {
+		r0 = returnFunc(ctx, search)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]datastruct.CustomerProfile)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, search)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_GetCustomerProfiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCustomerProfiles'
+type MockService_GetCustomerProfiles_Call struct {
+	*mock.Call
+}
+
+// GetCustomerProfiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+func (_e *MockService_Expecter) GetCustomerProfiles(ctx interface{}, search interface{}) *MockService_GetCustomerProfiles_Call {
+	return &MockService_GetCustomerProfiles_Call{Call: _e.mock.On("GetCustomerProfiles", ctx, search)}
+}
+
+func (_c *MockService_GetCustomerProfiles_Call) Run(run func(ctx context.Context, search string)) *MockService_GetCustomerProfiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_GetCustomerProfiles_Call) Return(customerProfiles []datastruct.CustomerProfile, err error) *MockService_GetCustomerProfiles_Call {
+	_c.Call.Return(customerProfiles, err)
+	return _c
+}
+
+func (_c *MockService_GetCustomerProfiles_Call) RunAndReturn(run func(ctx context.Context, search string) ([]datastruct.CustomerProfile, error)) *MockService_GetCustomerProfiles_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1471,6 +1673,132 @@ func (_c *MockService_LoadCategoriesFromYAML_Call) RunAndReturn(run func(ctx con
 	return _c
 }
 
+// RetryBroadcast provides a mock function for the type MockService
+func (_mock *MockService) RetryBroadcast(ctx context.Context, broadcastID int) error {
+	ret := _mock.Called(ctx, broadcastID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RetryBroadcast")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) error); ok {
+		r0 = returnFunc(ctx, broadcastID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_RetryBroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RetryBroadcast'
+type MockService_RetryBroadcast_Call struct {
+	*mock.Call
+}
+
+// RetryBroadcast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - broadcastID int
+func (_e *MockService_Expecter) RetryBroadcast(ctx interface{}, broadcastID interface{}) *MockService_RetryBroadcast_Call {
+	return &MockService_RetryBroadcast_Call{Call: _e.mock.On("RetryBroadcast", ctx, broadcastID)}
+}
+
+func (_c *MockService_RetryBroadcast_Call) Run(run func(ctx context.Context, broadcastID int)) *MockService_RetryBroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_RetryBroadcast_Call) Return(err error) *MockService_RetryBroadcast_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_RetryBroadcast_Call) RunAndReturn(run func(ctx context.Context, broadcastID int) error) *MockService_RetryBroadcast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SaveCustomer provides a mock function for the type MockService
+func (_mock *MockService) SaveCustomer(ctx context.Context, customerID int64, fullName string, username string) error {
+	ret := _mock.Called(ctx, customerID, fullName, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveCustomer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = returnFunc(ctx, customerID, fullName, username)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_SaveCustomer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveCustomer'
+type MockService_SaveCustomer_Call struct {
+	*mock.Call
+}
+
+// SaveCustomer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - fullName string
+//   - username string
+func (_e *MockService_Expecter) SaveCustomer(ctx interface{}, customerID interface{}, fullName interface{}, username interface{}) *MockService_SaveCustomer_Call {
+	return &MockService_SaveCustomer_Call{Call: _e.mock.On("SaveCustomer", ctx, customerID, fullName, username)}
+}
+
+func (_c *MockService_SaveCustomer_Call) Run(run func(ctx context.Context, customerID int64, fullName string, username string)) *MockService_SaveCustomer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_SaveCustomer_Call) Return(err error) *MockService_SaveCustomer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_SaveCustomer_Call) RunAndReturn(run func(ctx context.Context, customerID int64, fullName string, username string) error) *MockService_SaveCustomer_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SaveName provides a mock function for the type MockService
 func (_mock *MockService) SaveName(ctx context.Context, customerID int64, name string) error {
 	ret := _mock.Called(ctx, customerID, name)
@@ -1720,6 +2048,46 @@ func (_c *MockService_SetWaitingName_Call) Return(err error) *MockService_SetWai
 
 func (_c *MockService_SetWaitingName_Call) RunAndReturn(run func(ctx context.Context, customerID int64) error) *MockService_SetWaitingName_Call {
 	_c.Call.Return(run)
+	return _c
+}
+
+// StartBroadcastWorker provides a mock function for the type MockService
+func (_mock *MockService) StartBroadcastWorker(ctx context.Context) {
+	_mock.Called(ctx)
+	return
+}
+
+// MockService_StartBroadcastWorker_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'StartBroadcastWorker'
+type MockService_StartBroadcastWorker_Call struct {
+	*mock.Call
+}
+
+// StartBroadcastWorker is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockService_Expecter) StartBroadcastWorker(ctx interface{}) *MockService_StartBroadcastWorker_Call {
+	return &MockService_StartBroadcastWorker_Call{Call: _e.mock.On("StartBroadcastWorker", ctx)}
+}
+
+func (_c *MockService_StartBroadcastWorker_Call) Run(run func(ctx context.Context)) *MockService_StartBroadcastWorker_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_StartBroadcastWorker_Call) Return() *MockService_StartBroadcastWorker_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockService_StartBroadcastWorker_Call) RunAndReturn(run func(ctx context.Context)) *MockService_StartBroadcastWorker_Call {
+	_c.Run(run)
 	return _c
 }
 

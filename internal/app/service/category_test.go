@@ -22,7 +22,7 @@ func TestSupportService_GetCategoriesKeyboard(t *testing.T) {
 	// =====================================================================
 	t.Run("Root menu", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		// Возвращаем список корневых категорий
@@ -46,7 +46,7 @@ func TestSupportService_GetCategoriesKeyboard(t *testing.T) {
 	// =====================================================================
 	t.Run("First level submenu", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		parentID := 1
@@ -80,7 +80,7 @@ func TestSupportService_GetCategoriesKeyboard(t *testing.T) {
 	// =====================================================================
 	t.Run("Deep submenu", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		parentID := 4
@@ -119,7 +119,7 @@ func TestSupportService_GetMessages(t *testing.T) {
 	// =====================================================================
 	t.Run("Empty DB returns defaults", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		mockRepo.EXPECT().GetSetting(ctx, "messages").Return("", nil)
@@ -136,7 +136,7 @@ func TestSupportService_GetMessages(t *testing.T) {
 	// =====================================================================
 	t.Run("Partial DB returns merged with defaults", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		// В БД сохранено только кастомное приветствие, остальные поля пустые
@@ -158,7 +158,7 @@ func TestSupportService_ExportConfig(t *testing.T) {
 	// =====================================================================
 	t.Run("Build tree from flat DB records", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 		ctx := context.Background()
 
 		// Мокаем тексты
@@ -195,7 +195,7 @@ func TestSupportService_ExportConfig(t *testing.T) {
 func TestSupportService_SetCustomerLangByTopic(t *testing.T) {
 	t.Run("Success update language", func(t *testing.T) {
 		mockRepo := repoMocks.NewMockRepository(t)
-		svc := NewSupportService(mockRepo, nil, nil, "ru", 0)
+		svc := NewSupportService(mockRepo, nil, nil, "ru", 0, []int64{16})
 
 		ctx := context.Background()
 		topicID := 42

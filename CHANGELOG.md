@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.8] - 2026-03-16
+
+### Added
+- **Mass Broadcast System**: Introduced a robust background worker for sending mass messages to clients with HTML formatting support.
+- **Persistent Customers Directory**: Migrated from session-based tracking to a dedicated `customers` table. The bot now maintains a complete, persistent directory of all users who have ever interacted with it.
+- **Smart Rate Limiting & Safe Queueing**: The background worker strictly respects Telegram API limits and uses PostgreSQL's `FOR UPDATE SKIP LOCKED` for concurrent-safe queue processing.
+- **Dead-letter Queue & Retry Mechanism**: Broadcast history now tracks `sent`, `pending`, and `failed` deliveries. Added a UI capability to easily retry sending messages specifically to failed recipients.
+- **Automated Block Detection**: The worker automatically detects if a user has blocked the bot or deleted their account, flagging them as `is_blocked = true` in the database to prevent future API errors.
+- **Real-time Developer Alerts**: Panic recovery (`defer recover()`) in the background worker now captures full stack traces and instantly sends HTML-formatted alerts directly to the Telegram DMs of developers (configured via `DeveloperIDs`).
+- **Admin WebApp Broadcast UI**: Added a new "Broadcasts" tab in the WebApp featuring live customer search, a smart "Select All" toggle (ignoring blocked users), message input, and detailed history monitoring.
+- **Broadcast Unit Tests**: Added comprehensive test coverage for broadcast queue processing, error handling, database status updates, and developer notifications.
+
+### Fixed
+- **NPS Event Duplication Bug**: Fixed an issue where clients closing a topic themselves received duplicate NPS prompts and menus. The bot now correctly deduplicates Telegram's `CloseForumTopic` system events based on database state.
+- **Callback Router Collision**: Fixed a bug where category navigation buttons absorbed all callbacks (including NPS ratings) by adding strict `cat_` prefix filtering to the handler.
+
 ## [0.0.7] - 2026-03-15
 
 ### Added

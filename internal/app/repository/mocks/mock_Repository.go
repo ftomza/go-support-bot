@@ -38,6 +38,63 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
+// CheckAndCompleteBroadcast provides a mock function for the type MockRepository
+func (_mock *MockRepository) CheckAndCompleteBroadcast(ctx context.Context, broadcastID int) error {
+	ret := _mock.Called(ctx, broadcastID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckAndCompleteBroadcast")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) error); ok {
+		r0 = returnFunc(ctx, broadcastID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_CheckAndCompleteBroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAndCompleteBroadcast'
+type MockRepository_CheckAndCompleteBroadcast_Call struct {
+	*mock.Call
+}
+
+// CheckAndCompleteBroadcast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - broadcastID int
+func (_e *MockRepository_Expecter) CheckAndCompleteBroadcast(ctx interface{}, broadcastID interface{}) *MockRepository_CheckAndCompleteBroadcast_Call {
+	return &MockRepository_CheckAndCompleteBroadcast_Call{Call: _e.mock.On("CheckAndCompleteBroadcast", ctx, broadcastID)}
+}
+
+func (_c *MockRepository_CheckAndCompleteBroadcast_Call) Run(run func(ctx context.Context, broadcastID int)) *MockRepository_CheckAndCompleteBroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CheckAndCompleteBroadcast_Call) Return(err error) *MockRepository_CheckAndCompleteBroadcast_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_CheckAndCompleteBroadcast_Call) RunAndReturn(run func(ctx context.Context, broadcastID int) error) *MockRepository_CheckAndCompleteBroadcast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClearSession provides a mock function for the type MockRepository
 func (_mock *MockRepository) ClearSession(ctx context.Context, customerID int64) error {
 	ret := _mock.Called(ctx, customerID)
@@ -91,6 +148,78 @@ func (_c *MockRepository_ClearSession_Call) Return(err error) *MockRepository_Cl
 }
 
 func (_c *MockRepository_ClearSession_Call) RunAndReturn(run func(ctx context.Context, customerID int64) error) *MockRepository_ClearSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateBroadcast provides a mock function for the type MockRepository
+func (_mock *MockRepository) CreateBroadcast(ctx context.Context, text string, customerIDs []int64) (int, error) {
+	ret := _mock.Called(ctx, text, customerIDs)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateBroadcast")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []int64) (int, error)); ok {
+		return returnFunc(ctx, text, customerIDs)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []int64) int); ok {
+		r0 = returnFunc(ctx, text, customerIDs)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []int64) error); ok {
+		r1 = returnFunc(ctx, text, customerIDs)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CreateBroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateBroadcast'
+type MockRepository_CreateBroadcast_Call struct {
+	*mock.Call
+}
+
+// CreateBroadcast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - text string
+//   - customerIDs []int64
+func (_e *MockRepository_Expecter) CreateBroadcast(ctx interface{}, text interface{}, customerIDs interface{}) *MockRepository_CreateBroadcast_Call {
+	return &MockRepository_CreateBroadcast_Call{Call: _e.mock.On("CreateBroadcast", ctx, text, customerIDs)}
+}
+
+func (_c *MockRepository_CreateBroadcast_Call) Run(run func(ctx context.Context, text string, customerIDs []int64)) *MockRepository_CreateBroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []int64
+		if args[2] != nil {
+			arg2 = args[2].([]int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CreateBroadcast_Call) Return(n int, err error) *MockRepository_CreateBroadcast_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_CreateBroadcast_Call) RunAndReturn(run func(ctx context.Context, text string, customerIDs []int64) (int, error)) *MockRepository_CreateBroadcast_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -153,6 +282,68 @@ func (_c *MockRepository_GetAllCategoriesFull_Call) Return(categorys []datastruc
 }
 
 func (_c *MockRepository_GetAllCategoriesFull_Call) RunAndReturn(run func(ctx context.Context) ([]datastruct.Category, error)) *MockRepository_GetAllCategoriesFull_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetBroadcasts provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetBroadcasts(ctx context.Context) ([]datastruct.Broadcast, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetBroadcasts")
+	}
+
+	var r0 []datastruct.Broadcast
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]datastruct.Broadcast, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []datastruct.Broadcast); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]datastruct.Broadcast)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetBroadcasts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetBroadcasts'
+type MockRepository_GetBroadcasts_Call struct {
+	*mock.Call
+}
+
+// GetBroadcasts is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) GetBroadcasts(ctx interface{}) *MockRepository_GetBroadcasts_Call {
+	return &MockRepository_GetBroadcasts_Call{Call: _e.mock.On("GetBroadcasts", ctx)}
+}
+
+func (_c *MockRepository_GetBroadcasts_Call) Run(run func(ctx context.Context)) *MockRepository_GetBroadcasts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetBroadcasts_Call) Return(broadcasts []datastruct.Broadcast, err error) *MockRepository_GetBroadcasts_Call {
+	_c.Call.Return(broadcasts, err)
+	return _c
+}
+
+func (_c *MockRepository_GetBroadcasts_Call) RunAndReturn(run func(ctx context.Context) ([]datastruct.Broadcast, error)) *MockRepository_GetBroadcasts_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -359,6 +550,74 @@ func (_c *MockRepository_GetCustomerID_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// GetCustomerProfiles provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetCustomerProfiles(ctx context.Context, search string) ([]datastruct.CustomerProfile, error) {
+	ret := _mock.Called(ctx, search)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCustomerProfiles")
+	}
+
+	var r0 []datastruct.CustomerProfile
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]datastruct.CustomerProfile, error)); ok {
+		return returnFunc(ctx, search)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []datastruct.CustomerProfile); ok {
+		r0 = returnFunc(ctx, search)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]datastruct.CustomerProfile)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, search)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetCustomerProfiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCustomerProfiles'
+type MockRepository_GetCustomerProfiles_Call struct {
+	*mock.Call
+}
+
+// GetCustomerProfiles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - search string
+func (_e *MockRepository_Expecter) GetCustomerProfiles(ctx interface{}, search interface{}) *MockRepository_GetCustomerProfiles_Call {
+	return &MockRepository_GetCustomerProfiles_Call{Call: _e.mock.On("GetCustomerProfiles", ctx, search)}
+}
+
+func (_c *MockRepository_GetCustomerProfiles_Call) Run(run func(ctx context.Context, search string)) *MockRepository_GetCustomerProfiles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetCustomerProfiles_Call) Return(customerProfiles []datastruct.CustomerProfile, err error) *MockRepository_GetCustomerProfiles_Call {
+	_c.Call.Return(customerProfiles, err)
+	return _c
+}
+
+func (_c *MockRepository_GetCustomerProfiles_Call) RunAndReturn(run func(ctx context.Context, search string) ([]datastruct.CustomerProfile, error)) *MockRepository_GetCustomerProfiles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetCustomerTopic provides a mock function for the type MockRepository
 func (_mock *MockRepository) GetCustomerTopic(ctx context.Context, customerID int64) (*datastruct.CustomerTopic, error) {
 	ret := _mock.Called(ctx, customerID)
@@ -483,6 +742,74 @@ func (_c *MockRepository_GetMainPrompt_Call) Return(s string, err error) *MockRe
 }
 
 func (_c *MockRepository_GetMainPrompt_Call) RunAndReturn(run func(ctx context.Context) (string, error)) *MockRepository_GetMainPrompt_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPendingBroadcastTasks provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetPendingBroadcastTasks(ctx context.Context, limit int) ([]datastruct.BroadcastTask, error) {
+	ret := _mock.Called(ctx, limit)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPendingBroadcastTasks")
+	}
+
+	var r0 []datastruct.BroadcastTask
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) ([]datastruct.BroadcastTask, error)); ok {
+		return returnFunc(ctx, limit)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) []datastruct.BroadcastTask); ok {
+		r0 = returnFunc(ctx, limit)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]datastruct.BroadcastTask)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int) error); ok {
+		r1 = returnFunc(ctx, limit)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetPendingBroadcastTasks_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPendingBroadcastTasks'
+type MockRepository_GetPendingBroadcastTasks_Call struct {
+	*mock.Call
+}
+
+// GetPendingBroadcastTasks is a helper method to define mock.On call
+//   - ctx context.Context
+//   - limit int
+func (_e *MockRepository_Expecter) GetPendingBroadcastTasks(ctx interface{}, limit interface{}) *MockRepository_GetPendingBroadcastTasks_Call {
+	return &MockRepository_GetPendingBroadcastTasks_Call{Call: _e.mock.On("GetPendingBroadcastTasks", ctx, limit)}
+}
+
+func (_c *MockRepository_GetPendingBroadcastTasks_Call) Run(run func(ctx context.Context, limit int)) *MockRepository_GetPendingBroadcastTasks_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetPendingBroadcastTasks_Call) Return(broadcastTasks []datastruct.BroadcastTask, err error) *MockRepository_GetPendingBroadcastTasks_Call {
+	_c.Call.Return(broadcastTasks, err)
+	return _c
+}
+
+func (_c *MockRepository_GetPendingBroadcastTasks_Call) RunAndReturn(run func(ctx context.Context, limit int) ([]datastruct.BroadcastTask, error)) *MockRepository_GetPendingBroadcastTasks_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -621,6 +948,63 @@ func (_c *MockRepository_GetSetting_Call) RunAndReturn(run func(ctx context.Cont
 	return _c
 }
 
+// MarkCustomerAsBlocked provides a mock function for the type MockRepository
+func (_mock *MockRepository) MarkCustomerAsBlocked(ctx context.Context, customerID int64) error {
+	ret := _mock.Called(ctx, customerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for MarkCustomerAsBlocked")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = returnFunc(ctx, customerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_MarkCustomerAsBlocked_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MarkCustomerAsBlocked'
+type MockRepository_MarkCustomerAsBlocked_Call struct {
+	*mock.Call
+}
+
+// MarkCustomerAsBlocked is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+func (_e *MockRepository_Expecter) MarkCustomerAsBlocked(ctx interface{}, customerID interface{}) *MockRepository_MarkCustomerAsBlocked_Call {
+	return &MockRepository_MarkCustomerAsBlocked_Call{Call: _e.mock.On("MarkCustomerAsBlocked", ctx, customerID)}
+}
+
+func (_c *MockRepository_MarkCustomerAsBlocked_Call) Run(run func(ctx context.Context, customerID int64)) *MockRepository_MarkCustomerAsBlocked_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_MarkCustomerAsBlocked_Call) Return(err error) *MockRepository_MarkCustomerAsBlocked_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_MarkCustomerAsBlocked_Call) RunAndReturn(run func(ctx context.Context, customerID int64) error) *MockRepository_MarkCustomerAsBlocked_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ReplaceCategoriesTree provides a mock function for the type MockRepository
 func (_mock *MockRepository) ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error {
 	ret := _mock.Called(ctx, mainPrompt, messagesJSON, roots)
@@ -686,6 +1070,132 @@ func (_c *MockRepository_ReplaceCategoriesTree_Call) Return(err error) *MockRepo
 }
 
 func (_c *MockRepository_ReplaceCategoriesTree_Call) RunAndReturn(run func(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error) *MockRepository_ReplaceCategoriesTree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RetryBroadcast provides a mock function for the type MockRepository
+func (_mock *MockRepository) RetryBroadcast(ctx context.Context, broadcastID int) error {
+	ret := _mock.Called(ctx, broadcastID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RetryBroadcast")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int) error); ok {
+		r0 = returnFunc(ctx, broadcastID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_RetryBroadcast_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RetryBroadcast'
+type MockRepository_RetryBroadcast_Call struct {
+	*mock.Call
+}
+
+// RetryBroadcast is a helper method to define mock.On call
+//   - ctx context.Context
+//   - broadcastID int
+func (_e *MockRepository_Expecter) RetryBroadcast(ctx interface{}, broadcastID interface{}) *MockRepository_RetryBroadcast_Call {
+	return &MockRepository_RetryBroadcast_Call{Call: _e.mock.On("RetryBroadcast", ctx, broadcastID)}
+}
+
+func (_c *MockRepository_RetryBroadcast_Call) Run(run func(ctx context.Context, broadcastID int)) *MockRepository_RetryBroadcast_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_RetryBroadcast_Call) Return(err error) *MockRepository_RetryBroadcast_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_RetryBroadcast_Call) RunAndReturn(run func(ctx context.Context, broadcastID int) error) *MockRepository_RetryBroadcast_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SaveCustomer provides a mock function for the type MockRepository
+func (_mock *MockRepository) SaveCustomer(ctx context.Context, id int64, fullName string, username string) error {
+	ret := _mock.Called(ctx, id, fullName, username)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveCustomer")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, string, string) error); ok {
+		r0 = returnFunc(ctx, id, fullName, username)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SaveCustomer_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveCustomer'
+type MockRepository_SaveCustomer_Call struct {
+	*mock.Call
+}
+
+// SaveCustomer is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id int64
+//   - fullName string
+//   - username string
+func (_e *MockRepository_Expecter) SaveCustomer(ctx interface{}, id interface{}, fullName interface{}, username interface{}) *MockRepository_SaveCustomer_Call {
+	return &MockRepository_SaveCustomer_Call{Call: _e.mock.On("SaveCustomer", ctx, id, fullName, username)}
+}
+
+func (_c *MockRepository_SaveCustomer_Call) Run(run func(ctx context.Context, id int64, fullName string, username string)) *MockRepository_SaveCustomer_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SaveCustomer_Call) Return(err error) *MockRepository_SaveCustomer_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SaveCustomer_Call) RunAndReturn(run func(ctx context.Context, id int64, fullName string, username string) error) *MockRepository_SaveCustomer_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1076,6 +1586,75 @@ func (_c *MockRepository_UpdateActiveManager_Call) Return(err error) *MockReposi
 }
 
 func (_c *MockRepository_UpdateActiveManager_Call) RunAndReturn(run func(ctx context.Context, topicID int, managerID int64) error) *MockRepository_UpdateActiveManager_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateBroadcastRecipientStatus provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdateBroadcastRecipientStatus(ctx context.Context, recipientID int, status string, errText *string) error {
+	ret := _mock.Called(ctx, recipientID, status, errText)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateBroadcastRecipientStatus")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, string, *string) error); ok {
+		r0 = returnFunc(ctx, recipientID, status, errText)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdateBroadcastRecipientStatus_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateBroadcastRecipientStatus'
+type MockRepository_UpdateBroadcastRecipientStatus_Call struct {
+	*mock.Call
+}
+
+// UpdateBroadcastRecipientStatus is a helper method to define mock.On call
+//   - ctx context.Context
+//   - recipientID int
+//   - status string
+//   - errText *string
+func (_e *MockRepository_Expecter) UpdateBroadcastRecipientStatus(ctx interface{}, recipientID interface{}, status interface{}, errText interface{}) *MockRepository_UpdateBroadcastRecipientStatus_Call {
+	return &MockRepository_UpdateBroadcastRecipientStatus_Call{Call: _e.mock.On("UpdateBroadcastRecipientStatus", ctx, recipientID, status, errText)}
+}
+
+func (_c *MockRepository_UpdateBroadcastRecipientStatus_Call) Run(run func(ctx context.Context, recipientID int, status string, errText *string)) *MockRepository_UpdateBroadcastRecipientStatus_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 *string
+		if args[3] != nil {
+			arg3 = args[3].(*string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdateBroadcastRecipientStatus_Call) Return(err error) *MockRepository_UpdateBroadcastRecipientStatus_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdateBroadcastRecipientStatus_Call) RunAndReturn(run func(ctx context.Context, recipientID int, status string, errText *string) error) *MockRepository_UpdateBroadcastRecipientStatus_Call {
 	_c.Call.Return(run)
 	return _c
 }

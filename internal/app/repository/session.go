@@ -58,3 +58,17 @@ func (r *SupportRepo) UpdateThrottle(ctx context.Context, customerID int64) erro
 		customerID)
 	return err
 }
+
+// SaveCustomer сохраняет или обновляет профиль клиента
+func (r *SupportRepo) SaveCustomer(ctx context.Context, id int64, fullName string, username string) error {
+	query := `
+		INSERT INTO customers (id, full_name, username, updated_at) 
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (id) DO UPDATE 
+		SET full_name = EXCLUDED.full_name,
+		    username = EXCLUDED.username,
+		    updated_at = NOW()
+	`
+	_, err := r.db.Exec(ctx, query, id, fullName, username)
+	return err
+}
