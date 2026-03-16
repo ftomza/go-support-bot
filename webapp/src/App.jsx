@@ -367,6 +367,8 @@ export default function App() {
                                     { key: 'CloseTopicButton', label: 'Текст на кнопке [Завершить]', parent: config.Messages },
                                     { key: 'ButtonBack', label: 'Кнопка [Назад]', parent: config.Messages },
                                     { key: 'ButtonHome', label: 'Кнопка [В начало]', parent: config.Messages },
+                                    { key: 'RateService', label: 'Вопрос об оценке', parent: config.Messages },
+                                    { key: 'RatingThanks', label: 'Благодарность об оценке', parent: config.Messages },
                                 ].map(({ key, label, parent }) => (
                                     <div key={key} className="flex flex-col gap-1">
                                         <label className="text-sm font-semibold text-tg-hint">{label}</label>

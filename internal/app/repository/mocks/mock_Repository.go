@@ -753,6 +753,75 @@ func (_c *MockRepository_SaveName_Call) RunAndReturn(run func(ctx context.Contex
 	return _c
 }
 
+// SaveRating provides a mock function for the type MockRepository
+func (_mock *MockRepository) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
+	ret := _mock.Called(ctx, customerID, topicID, score)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SaveRating")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, int, int) error); ok {
+		r0 = returnFunc(ctx, customerID, topicID, score)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SaveRating_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SaveRating'
+type MockRepository_SaveRating_Call struct {
+	*mock.Call
+}
+
+// SaveRating is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - topicID int
+//   - score int
+func (_e *MockRepository_Expecter) SaveRating(ctx interface{}, customerID interface{}, topicID interface{}, score interface{}) *MockRepository_SaveRating_Call {
+	return &MockRepository_SaveRating_Call{Call: _e.mock.On("SaveRating", ctx, customerID, topicID, score)}
+}
+
+func (_c *MockRepository_SaveRating_Call) Run(run func(ctx context.Context, customerID int64, topicID int, score int)) *MockRepository_SaveRating_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SaveRating_Call) Return(err error) *MockRepository_SaveRating_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SaveRating_Call) RunAndReturn(run func(ctx context.Context, customerID int64, topicID int, score int) error) *MockRepository_SaveRating_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SaveTopic provides a mock function for the type MockRepository
 func (_mock *MockRepository) SaveTopic(ctx context.Context, customerID int64, topicID int, categoryID int, langCode string) error {
 	ret := _mock.Called(ctx, customerID, topicID, categoryID, langCode)
@@ -944,6 +1013,69 @@ func (_c *MockRepository_SetWaitingName_Call) Return(err error) *MockRepository_
 }
 
 func (_c *MockRepository_SetWaitingName_Call) RunAndReturn(run func(ctx context.Context, customerID int64) error) *MockRepository_SetWaitingName_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateActiveManager provides a mock function for the type MockRepository
+func (_mock *MockRepository) UpdateActiveManager(ctx context.Context, topicID int, managerID int64) error {
+	ret := _mock.Called(ctx, topicID, managerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateActiveManager")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int, int64) error); ok {
+		r0 = returnFunc(ctx, topicID, managerID)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_UpdateActiveManager_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateActiveManager'
+type MockRepository_UpdateActiveManager_Call struct {
+	*mock.Call
+}
+
+// UpdateActiveManager is a helper method to define mock.On call
+//   - ctx context.Context
+//   - topicID int
+//   - managerID int64
+func (_e *MockRepository_Expecter) UpdateActiveManager(ctx interface{}, topicID interface{}, managerID interface{}) *MockRepository_UpdateActiveManager_Call {
+	return &MockRepository_UpdateActiveManager_Call{Call: _e.mock.On("UpdateActiveManager", ctx, topicID, managerID)}
+}
+
+func (_c *MockRepository_UpdateActiveManager_Call) Run(run func(ctx context.Context, topicID int, managerID int64)) *MockRepository_UpdateActiveManager_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int
+		if args[1] != nil {
+			arg1 = args[1].(int)
+		}
+		var arg2 int64
+		if args[2] != nil {
+			arg2 = args[2].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_UpdateActiveManager_Call) Return(err error) *MockRepository_UpdateActiveManager_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_UpdateActiveManager_Call) RunAndReturn(run func(ctx context.Context, topicID int, managerID int64) error) *MockRepository_UpdateActiveManager_Call {
 	_c.Call.Return(run)
 	return _c
 }

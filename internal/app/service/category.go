@@ -30,6 +30,8 @@ type YamlMessages struct {
 	SelectSubtopic       string `yaml:"SelectSubtopic" json:"SelectSubtopic"`
 	ButtonBack           string `yaml:"ButtonBack" json:"ButtonBack"`
 	ButtonHome           string `yaml:"ButtonHome" json:"ButtonHome"`
+	RateService          string `yaml:"RateService" json:"RateService"`
+	RatingThanks         string `yaml:"RatingThanks" json:"RatingThanks"`
 
 	// НОВЫЕ ПОЛЯ ДЛЯ МЕНЕДЖЕРОВ
 	NotifyManagerNew         string `yaml:"NotifyManagerNew" json:"NotifyManagerNew"`
@@ -47,6 +49,8 @@ func GetDefaultMessages() YamlMessages {
 		OutOfHours:       "🌙 <b>Внимание: нерабочее время</b>\nМенеджеры этой линии сейчас отдыхают. Ваше сообщение сохранено и будет обработано в рабочие часы (<b>%s</b>).",
 		ServerError:      "Ошибка сервера. Попробуйте позже.",
 		CloseTopicButton: "❌ Завершить обращение",
+		RateService:      "Пожалуйста, оцените качество решения вашего вопроса:",
+		RatingThanks:     "Спасибо за вашу оценку! ⭐️",
 
 		TopicClosedByManager: "✅ Менеджер завершил диалог. Спасибо за обращение!",
 		TopicClosedByClient:  "✅ Диалог успешно завершен. Спасибо!",
@@ -154,7 +158,13 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 	if cfg.Messages.CloseTopicButton == "" {
 		cfg.Messages.CloseTopicButton = defaults.CloseTopicButton
 	}
-	// Добавьте это сразу после проверки CloseTopicButton
+	if cfg.Messages.RateService == "" {
+		cfg.Messages.RateService = defaults.RateService
+	}
+	if cfg.Messages.RatingThanks == "" {
+		cfg.Messages.RatingThanks = defaults.RatingThanks
+	}
+
 	if cfg.Messages.TopicClosedByManager == "" {
 		cfg.Messages.TopicClosedByManager = defaults.TopicClosedByManager
 	}
@@ -280,6 +290,12 @@ func (s *SupportService) GetMessages(ctx context.Context) (YamlMessages, error) 
 	}
 	if msgs.CloseTopicButton == "" {
 		msgs.CloseTopicButton = defaults.CloseTopicButton
+	}
+	if msgs.RateService == "" {
+		msgs.RateService = defaults.RateService
+	}
+	if msgs.RatingThanks == "" {
+		msgs.RatingThanks = defaults.RatingThanks
 	}
 
 	// Добавьте это сразу после проверки CloseTopicButton
