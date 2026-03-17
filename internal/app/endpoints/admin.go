@@ -17,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"runtime/debug"
+	"time"
 
 	"go-support-bot/internal/app/service"
 	"go-support-bot/web"
@@ -142,6 +143,15 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 
 		log.Printf("📦 PARSED CONFIG: %+v", cfg)
 
+		// ========================================================
+		// 🔥 ВАЛИДАЦИЯ КОНФИГА ПЕРЕД СОХРАНЕНИЕМ
+		if err := service.ValidateYamlConfig(&cfg); err != nil {
+			// Отдаем текст ошибки (400 Bad Request) фронтенду, чтобы он показал Alert
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return nil // Возвращаем nil, чтобы не логировало в консоль как панику сервера
+		}
+		// ========================================================
+
 		// 3. Сохраняем в БД
 		if err := api.svc.ImportConfig(r.Context(), &cfg); err != nil {
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -202,6 +212,11 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 			return err
 		}
 
+		if err := service.ValidateTelegramHTML(req.Text); err != nil {
+			http.Error(w, fmt.Sprintf("Ошибка HTML в тексте рассылки: %v", err), http.StatusBadRequest)
+			return nil
+		}
+
 		_, err := api.svc.CreateBroadcast(r.Context(), req.Text, req.CustomerIDs)
 		if err != nil {
 			return err
@@ -235,6 +250,42 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 		return nil
+	})))
+
+	// Получение статистики NPS с фильтрами по дате
+	mux.HandleFunc("/api/stats/nps", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return nil
+		}
+
+		var startDate, endDate *time.Time
+
+		// Парсим даты из Query-параметров (формат: 2026-03-01)
+		if startStr := r.URL.Query().Get("start"); startStr != "" {
+			if parsed, err := time.Parse("2006-01-02", startStr); err == nil {
+				// Устанавливаем начало дня
+				startOfDay := parsed.Truncate(24 * time.Hour)
+				startDate = &startOfDay
+			}
+		}
+
+		if endStr := r.URL.Query().Get("end"); endStr != "" {
+			if parsed, err := time.Parse("2006-01-02", endStr); err == nil {
+				// Устанавливаем конец дня (23:59:59)
+				endOfDay := parsed.Truncate(24 * time.Hour).Add(24*time.Hour - time.Second)
+				endDate = &endOfDay
+			}
+		}
+
+		stats, err := api.svc.GetNPSStats(r.Context(), startDate, endDate)
+		if err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return fmt.Errorf("get nps stats error: %w", err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		return json.NewEncoder(w).Encode(stats)
 	})))
 }
 

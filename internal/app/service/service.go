@@ -10,6 +10,7 @@ import (
 	"context"
 	"go-support-bot/internal/app/datastruct"
 	"log"
+	"time"
 
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -56,6 +57,8 @@ type Service interface {
 	GetBroadcasts(ctx context.Context) ([]datastruct.Broadcast, error)
 	RetryBroadcast(ctx context.Context, broadcastID int) error
 	StartBroadcastWorker(ctx context.Context)
+
+	GetNPSStats(ctx context.Context, startDate, endDate *time.Time) (*datastruct.NPSStats, error)
 }
 
 func (s *SupportService) NotifyDevelopers(ctx context.Context, text string) {

@@ -7,6 +7,7 @@ package mocks
 import (
 	"context"
 	"go-support-bot/internal/app/datastruct"
+	"time"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -742,6 +743,80 @@ func (_c *MockRepository_GetMainPrompt_Call) Return(s string, err error) *MockRe
 }
 
 func (_c *MockRepository_GetMainPrompt_Call) RunAndReturn(run func(ctx context.Context) (string, error)) *MockRepository_GetMainPrompt_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNPSStats provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetNPSStats(ctx context.Context, startDate *time.Time, endDate *time.Time) (*datastruct.NPSStats, error) {
+	ret := _mock.Called(ctx, startDate, endDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNPSStats")
+	}
+
+	var r0 *datastruct.NPSStats
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) (*datastruct.NPSStats, error)); ok {
+		return returnFunc(ctx, startDate, endDate)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) *datastruct.NPSStats); ok {
+		r0 = returnFunc(ctx, startDate, endDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*datastruct.NPSStats)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *time.Time, *time.Time) error); ok {
+		r1 = returnFunc(ctx, startDate, endDate)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetNPSStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNPSStats'
+type MockRepository_GetNPSStats_Call struct {
+	*mock.Call
+}
+
+// GetNPSStats is a helper method to define mock.On call
+//   - ctx context.Context
+//   - startDate *time.Time
+//   - endDate *time.Time
+func (_e *MockRepository_Expecter) GetNPSStats(ctx interface{}, startDate interface{}, endDate interface{}) *MockRepository_GetNPSStats_Call {
+	return &MockRepository_GetNPSStats_Call{Call: _e.mock.On("GetNPSStats", ctx, startDate, endDate)}
+}
+
+func (_c *MockRepository_GetNPSStats_Call) Run(run func(ctx context.Context, startDate *time.Time, endDate *time.Time)) *MockRepository_GetNPSStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *time.Time
+		if args[1] != nil {
+			arg1 = args[1].(*time.Time)
+		}
+		var arg2 *time.Time
+		if args[2] != nil {
+			arg2 = args[2].(*time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetNPSStats_Call) Return(nPSStats *datastruct.NPSStats, err error) *MockRepository_GetNPSStats_Call {
+	_c.Call.Return(nPSStats, err)
+	return _c
+}
+
+func (_c *MockRepository_GetNPSStats_Call) RunAndReturn(run func(ctx context.Context, startDate *time.Time, endDate *time.Time) (*datastruct.NPSStats, error)) *MockRepository_GetNPSStats_Call {
 	_c.Call.Return(run)
 	return _c
 }

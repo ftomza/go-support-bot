@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown, Users, Send, Search, RotateCcw, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown, Users, Send, Search, RotateCcw, AlertCircle, BarChart, Calendar } from 'lucide-react';
 
 const tg = window.Telegram?.WebApp;
 
@@ -135,7 +135,7 @@ export default function App() {
     const configRef = useRef(null);
     const [managers, setManagers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('themes'); // themes, texts, broadcasts
+    const [activeTab, setActiveTab] = useState('themes'); // themes, texts, broadcasts, stats
     const [promptModal, setPromptModal] = useState({ isOpen: false, path: null, value: '' });
 
     // Состояния для вкладки Рассылок
@@ -145,6 +145,11 @@ export default function App() {
     const [broadcastText, setBroadcastText] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [isSending, setIsSending] = useState(false);
+
+    // Состояния для вкладки Статистики
+    const [npsStats, setNpsStats] = useState(null);
+    const [datePreset, setDatePreset] = useState('all'); // all, today, week, month, custom
+    const [customDates, setCustomDates] = useState({ start: '', end: '' });
 
     useEffect(() => { configRef.current = config; }, [config]);
 
@@ -161,20 +166,18 @@ export default function App() {
     // Управляем видимостью главной кнопки Telegram
     useEffect(() => {
         if (tg) {
-            if (activeTab === 'broadcasts') {
-                tg.MainButton.hide(); // Скрываем кнопку сохранения на вкладке рассылок
+            if (activeTab === 'broadcasts' || activeTab === 'stats') {
+                tg.MainButton.hide();
             } else if (config) {
                 tg.MainButton.show();
             }
         }
     }, [activeTab, config]);
 
-    // Загрузка данных для вкладки Рассылок
     useEffect(() => {
-        if (activeTab === 'broadcasts') {
-            fetchBroadcastData();
-        }
-    }, [activeTab]);
+        if (activeTab === 'broadcasts') fetchBroadcastData();
+        if (activeTab === 'stats') fetchNPSStats();
+    }, [activeTab, datePreset, customDates]);
 
     const fetchData = async () => {
         try {
@@ -214,6 +217,48 @@ export default function App() {
         }
     };
 
+    const fetchNPSStats = async () => {
+        let url = '/api/stats/nps';
+        let params = new URLSearchParams();
+
+        const today = new Date();
+        let start = '';
+        let end = '';
+
+        if (datePreset === 'today') {
+            start = today.toISOString().split('T')[0];
+            end = start;
+        } else if (datePreset === 'week') {
+            const pastWeek = new Date(today);
+            pastWeek.setDate(pastWeek.getDate() - 7);
+            start = pastWeek.toISOString().split('T')[0];
+            end = today.toISOString().split('T')[0];
+        } else if (datePreset === 'month') {
+            const pastMonth = new Date(today);
+            pastMonth.setMonth(pastMonth.getMonth() - 1);
+            start = pastMonth.toISOString().split('T')[0];
+            end = today.toISOString().split('T')[0];
+        } else if (datePreset === 'custom') {
+            if (customDates.start) start = customDates.start;
+            if (customDates.end) end = customDates.end;
+        }
+
+        if (start) params.append('start', start);
+        if (end) params.append('end', end);
+
+        if (params.toString()) url += '?' + params.toString();
+
+        try {
+            const headers = { 'X-Telegram-Init-Data': tg?.initData || '' };
+            const res = await fetch(url, { headers });
+            if (res.ok) {
+                setNpsStats(await res.json());
+            }
+        } catch (err) {
+            console.error("Ошибка загрузки статистики:", err);
+        }
+    };
+
     const saveConfig = async () => {
         const currentConfig = configRef.current;
         if (!currentConfig) return;
@@ -225,10 +270,14 @@ export default function App() {
                 headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
                 body: JSON.stringify(currentConfig)
             });
-            if (!res.ok) throw new Error('Ошибка сервера');
+
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText);
+            }
             tg?.showAlert('Успешно сохранено!');
         } catch (err) {
-            tg?.showAlert('Ошибка при сохранении: ' + err.message);
+            tg?.showAlert('Ошибка: ' + err.message);
         } finally {
             tg?.MainButton.hideProgress();
         }
@@ -247,9 +296,9 @@ export default function App() {
     const toggleAllVisible = () => {
         const validCustomers = customers.filter(c => !c.is_blocked);
         if (selectedCustomers.size === validCustomers.length) {
-            setSelectedCustomers(new Set()); // Снять все
+            setSelectedCustomers(new Set());
         } else {
-            setSelectedCustomers(new Set(validCustomers.map(c => c.customer_id))); // Выбрать всех доступных
+            setSelectedCustomers(new Set(validCustomers.map(c => c.customer_id)));
         }
     };
 
@@ -269,14 +318,17 @@ export default function App() {
                     customer_ids: Array.from(selectedCustomers)
                 })
             });
-            if (!res.ok) throw new Error('Ошибка сервера');
+            if (!res.ok) {
+                const errText = await res.text();
+                throw new Error(errText);
+            }
 
             tg?.showAlert('Рассылка успешно добавлена в очередь!');
             setBroadcastText('');
             setSelectedCustomers(new Set());
-            fetchBroadcastData(searchQuery); // Обновляем историю
+            fetchBroadcastData(searchQuery);
         } catch (err) {
-            tg?.showAlert('Ошибка при запуске рассылки: ' + err.message);
+            tg?.showAlert('Ошибка: ' + err.message);
         } finally {
             setIsSending(false);
         }
@@ -416,10 +468,11 @@ export default function App() {
                 </div>
             )}
 
-            <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10 shadow-sm">
-                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'themes' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('themes')}><Settings size={18}/> Темы</button>
-                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('texts')}><MessageSquare size={18}/> Тексты</button>
-                <button className={`flex-1 p-3 flex items-center justify-center gap-2 font-semibold ${activeTab === 'broadcasts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('broadcasts')}><Users size={18}/> Рассылка</button>
+            <div className="flex border-b border-tg-hint/30 mb-4 bg-tg-secondaryBg sticky top-0 z-10 shadow-sm overflow-x-auto">
+                <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'themes' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('themes')}><Settings size={20}/> Темы</button>
+                <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('texts')}><MessageSquare size={20}/> Тексты</button>
+                <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'broadcasts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('broadcasts')}><Send size={20}/> Рассылка</button>
+                <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'stats' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('stats')}><BarChart size={20}/> Статистика</button>
             </div>
 
             <div className="px-4">
@@ -443,6 +496,7 @@ export default function App() {
 
                 {activeTab === 'texts' && (
                     <div className="flex flex-col gap-6 pb-6">
+                        {/* Содержимое вкладки текстов (оставляем как было) */}
                         <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
                             <h2 className="text-xl font-bold mb-4 text-tg-text">Сообщения для клиентов</h2>
                             <div className="flex flex-col gap-4">
@@ -510,8 +564,7 @@ export default function App() {
 
                 {activeTab === 'broadcasts' && (
                     <div className="flex flex-col gap-6 pb-6">
-
-                        {/* Создание рассылки */}
+                        {/* Содержимое вкладки Рассылки (оставляем как было) */}
                         <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
                             <h2 className="text-xl font-bold mb-4 text-tg-text flex items-center gap-2">
                                 <Send size={20}/> Новое сообщение
@@ -598,7 +651,6 @@ export default function App() {
                                 История рассылок
                                 <button onClick={() => fetchBroadcastData(searchQuery)} className="text-tg-button text-sm font-normal hover:underline">Обновить</button>
                             </h2>
-
                             <div className="flex flex-col gap-3">
                                 {broadcastHistory.length === 0 ? (
                                     <div className="text-center text-tg-hint py-4">История пуста</div>
@@ -634,12 +686,125 @@ export default function App() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                )}
 
+                {activeTab === 'stats' && (
+                    <div className="flex flex-col gap-6 pb-6">
+                        {/* Фильтр Дат */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-lg font-bold mb-3 text-tg-text flex items-center gap-2">
+                                <Calendar size={18}/> Период
+                            </h2>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                                {[
+                                    { id: 'all', label: 'Всё время' },
+                                    { id: 'today', label: 'Сегодня' },
+                                    { id: 'week', label: '7 дней' },
+                                    { id: 'month', label: 'Месяц' },
+                                    { id: 'custom', label: 'Свой...' },
+                                ].map(preset => (
+                                    <button
+                                        key={preset.id}
+                                        onClick={() => setDatePreset(preset.id)}
+                                        className={`px-3 py-1.5 text-sm font-medium rounded-lg border ${datePreset === preset.id ? 'bg-tg-button text-tg-buttonText border-tg-button' : 'bg-tg-bg text-tg-text border-tg-hint/30 hover:bg-tg-hint/10'}`}
+                                    >
+                                        {preset.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {datePreset === 'custom' && (
+                                <div className="flex items-center gap-2">
+                                    <input type="date" value={customDates.start} onChange={e => setCustomDates(p => ({...p, start: e.target.value}))} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 flex-1 outline-none focus:border-tg-link text-sm"/>
+                                    <span className="text-tg-hint">-</span>
+                                    <input type="date" value={customDates.end} onChange={e => setCustomDates(p => ({...p, end: e.target.value}))} className="bg-tg-bg border border-tg-hint/30 rounded p-1.5 flex-1 outline-none focus:border-tg-link text-sm"/>
+                                </div>
+                            )}
+                        </div>
+
+                        {!npsStats ? (
+                            <div className="text-center py-6 text-tg-hint text-sm">Загрузка статистики...</div>
+                        ) : (
+                            <>
+                                {/* Сводка */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20 flex flex-col items-center justify-center text-center">
+                                        <span className="text-xs text-tg-hint uppercase font-bold tracking-wider mb-1">Ср. Оценка</span>
+                                        <div className="text-3xl font-black text-tg-text flex items-center gap-1">
+                                            {npsStats.average_score.toFixed(1)} <span className="text-yellow-400 text-2xl">★</span>
+                                        </div>
+                                    </div>
+                                    <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20 flex flex-col items-center justify-center text-center">
+                                        <span className="text-xs text-tg-hint uppercase font-bold tracking-wider mb-1">NPS Индекс</span>
+                                        <div className={`text-3xl font-black ${npsStats.nps >= 50 ? 'text-green-500' : npsStats.nps > 0 ? 'text-yellow-500' : 'text-red-500'}`}>
+                                            {npsStats.nps > 0 ? '+' : ''}{npsStats.nps.toFixed(0)}%
+                                        </div>
+                                    </div>
+                                    <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20 flex flex-col items-center justify-center text-center col-span-2 md:col-span-1">
+                                        <span className="text-xs text-tg-hint uppercase font-bold tracking-wider mb-1">Всего оценок</span>
+                                        <div className="text-3xl font-black text-tg-text">{npsStats.total_votes}</div>
+                                    </div>
+                                </div>
+
+                                {/* Распределение */}
+                                <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                                    <h3 className="text-sm font-bold text-tg-hint uppercase tracking-wider mb-4">Распределение оценок</h3>
+                                    <div className="flex flex-col gap-3">
+                                        {[5, 4, 3, 2, 1].map(score => {
+                                            const count = npsStats.score_distribution[score] || 0;
+                                            const percentage = npsStats.total_votes > 0 ? (count / npsStats.total_votes) * 100 : 0;
+                                            const colors = { 5: 'bg-green-500', 4: 'bg-lime-400', 3: 'bg-yellow-400', 2: 'bg-orange-500', 1: 'bg-red-500' };
+                                            return (
+                                                <div key={score} className="flex items-center gap-3">
+                                                    <div className="w-8 flex items-center justify-end font-bold text-sm">{score} ★</div>
+                                                    <div className="flex-1 h-3 bg-tg-bg rounded-full overflow-hidden">
+                                                        <div className={`h-full ${colors[score]}`} style={{ width: `${percentage}%` }}/>
+                                                    </div>
+                                                    <div className="w-8 text-right text-xs text-tg-hint">{count}</div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Лидерборд менеджеров */}
+                                <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                                    <h3 className="text-sm font-bold text-tg-hint uppercase tracking-wider mb-4">Рейтинг менеджеров</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm text-left">
+                                            <thead className="text-xs text-tg-hint uppercase border-b border-tg-hint/20">
+                                            <tr>
+                                                <th className="px-2 py-2">Сотрудник</th>
+                                                <th className="px-2 py-2 text-center">Оценки</th>
+                                                <th className="px-2 py-2 text-right">Средний</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {npsStats.managers?.length === 0 ? (
+                                                <tr><td colSpan="3" className="text-center py-4 text-tg-hint">Нет данных</td></tr>
+                                            ) : (
+                                                npsStats.managers.map((m, idx) => (
+                                                    <tr key={idx} className="border-b border-tg-hint/10 last:border-0">
+                                                        <td className="px-2 py-3 font-medium whitespace-nowrap">{m.full_name}</td>
+                                                        <td className="px-2 py-3 text-center text-tg-hint">{m.total_votes}</td>
+                                                        <td className="px-2 py-3 text-right font-bold text-tg-text">
+                                                            {m.average_score.toFixed(1)} <span className="text-yellow-400">★</span>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>
 
-            {!tg?.initData && activeTab !== 'broadcasts' && (
+            {!tg?.initData && (activeTab === 'themes' || activeTab === 'texts') && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-tg-bg border-t border-tg-hint/30">
                     <button onClick={saveConfig} className="w-full bg-tg-button text-tg-buttonText py-3 rounded-xl font-bold shadow-lg">Сохранить (Dev)</button>
                 </div>

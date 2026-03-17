@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.9] - 2026-03-17
+
+### Added
+- **NPS Analytics Dashboard**: Introduced a new "Statistics" tab in the Admin WebApp to visualize customer satisfaction.
+- **Advanced Metrics Calculation**: The dashboard now calculates the Average Score, Total Votes, Score Distribution (1-5 stars), and the classic Net Promoter Score (NPS) formula directly from the `topic_ratings` table.
+- **Manager Leaderboard**: Added a real-time leaderboard showing total votes and average scores grouped by active managers. The backend service layer automatically resolves `manager_id` to actual Telegram names.
+- **Dynamic Time Filtering**: Added time range presets (Today, 7 Days, Month) and a custom date picker to filter NPS statistics dynamically on both frontend and database layers.
+- **Strict Telegram HTML Validator**: Implemented a custom stack-based HTML validator (`ValidateTelegramHTML` and `ValidateYamlConfig`) to pre-validate all system texts, category prompts, and broadcast messages before saving them to the database. This prevents `Bad Request: can't parse entities` errors caused by unclosed tags or invalid attributes.
+
+### Improved
+- **Admin UI Layout**: Reorganized the Admin WebApp navigation into a scrollable horizontal tab bar to accommodate new sections without cluttering the screen.
+- **Service Layer Architecture**: Cleaned up the data flow for statistics. The Repository now strictly handles raw database queries, while the Service layer is responsible for data enrichment (mapping manager IDs to names).
+
 ## [0.0.8] - 2026-03-16
 
 ### Added
