@@ -9,6 +9,7 @@ package repository
 import (
 	"context"
 	"go-support-bot/internal/app/datastruct"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -44,6 +45,8 @@ type Repository interface {
 	MarkCustomerAsBlocked(ctx context.Context, customerID int64) error
 	CheckAndCompleteBroadcast(ctx context.Context, broadcastID int) error
 	SaveCustomer(ctx context.Context, id int64, fullName string, username string) error
+
+	GetNPSStats(ctx context.Context, startDate, endDate *time.Time) (*datastruct.NPSStats, error)
 }
 
 type SupportRepo struct {
