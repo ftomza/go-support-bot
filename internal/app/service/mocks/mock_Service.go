@@ -8,6 +8,7 @@ import (
 	"context"
 	"go-support-bot/internal/app/datastruct"
 	"go-support-bot/internal/app/service"
+	"time"
 
 	"github.com/mymmrac/telego"
 	"github.com/mymmrac/telego/telegohandler"
@@ -1160,6 +1161,80 @@ func (_c *MockService_GetMessages_Call) Return(yamlMessages service.YamlMessages
 }
 
 func (_c *MockService_GetMessages_Call) RunAndReturn(run func(ctx context.Context) (service.YamlMessages, error)) *MockService_GetMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetNPSStats provides a mock function for the type MockService
+func (_mock *MockService) GetNPSStats(ctx context.Context, startDate *time.Time, endDate *time.Time) (*datastruct.NPSStats, error) {
+	ret := _mock.Called(ctx, startDate, endDate)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNPSStats")
+	}
+
+	var r0 *datastruct.NPSStats
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) (*datastruct.NPSStats, error)); ok {
+		return returnFunc(ctx, startDate, endDate)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *time.Time, *time.Time) *datastruct.NPSStats); ok {
+		r0 = returnFunc(ctx, startDate, endDate)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*datastruct.NPSStats)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *time.Time, *time.Time) error); ok {
+		r1 = returnFunc(ctx, startDate, endDate)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_GetNPSStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetNPSStats'
+type MockService_GetNPSStats_Call struct {
+	*mock.Call
+}
+
+// GetNPSStats is a helper method to define mock.On call
+//   - ctx context.Context
+//   - startDate *time.Time
+//   - endDate *time.Time
+func (_e *MockService_Expecter) GetNPSStats(ctx interface{}, startDate interface{}, endDate interface{}) *MockService_GetNPSStats_Call {
+	return &MockService_GetNPSStats_Call{Call: _e.mock.On("GetNPSStats", ctx, startDate, endDate)}
+}
+
+func (_c *MockService_GetNPSStats_Call) Run(run func(ctx context.Context, startDate *time.Time, endDate *time.Time)) *MockService_GetNPSStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *time.Time
+		if args[1] != nil {
+			arg1 = args[1].(*time.Time)
+		}
+		var arg2 *time.Time
+		if args[2] != nil {
+			arg2 = args[2].(*time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_GetNPSStats_Call) Return(nPSStats *datastruct.NPSStats, err error) *MockService_GetNPSStats_Call {
+	_c.Call.Return(nPSStats, err)
+	return _c
+}
+
+func (_c *MockService_GetNPSStats_Call) RunAndReturn(run func(ctx context.Context, startDate *time.Time, endDate *time.Time) (*datastruct.NPSStats, error)) *MockService_GetNPSStats_Call {
 	_c.Call.Return(run)
 	return _c
 }
