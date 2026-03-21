@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown, Users, Send, Search, RotateCcw, AlertCircle, BarChart, Calendar } from 'lucide-react';
+import { ChevronRight, ChevronDown, Plus, Trash2, Settings, MessageSquare, Clock, ArrowUp, ArrowDown, Users, Send, Search, RotateCcw, AlertCircle, BarChart, Calendar, Shield } from 'lucide-react';
 
 const tg = window.Telegram?.WebApp;
 
@@ -283,6 +283,25 @@ export default function App() {
         }
     };
 
+    const handleToggleBan = async (customerId, currentStatus) => {
+        const action = currentStatus ? 'Разблокировать' : 'Заблокировать (Вечный бан)';
+        if (!window.confirm(`${action} пользователя ${customerId}?`)) return;
+
+        try {
+            const res = await fetch('/api/customers/ban', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Telegram-Init-Data': tg?.initData || '' },
+                body: JSON.stringify({ customer_id: customerId, is_banned: !currentStatus })
+            });
+            if (!res.ok) throw new Error('Ошибка сервера');
+
+            tg?.showAlert(`Статус успешно изменен!`);
+            fetchBroadcastData(searchQuery); // Обновляем список юзеров
+        } catch (err) {
+            tg?.showAlert('Ошибка: ' + err.message);
+        }
+    };
+
     // --- Обработчики для Рассылок ---
     const toggleCustomer = (id) => {
         setSelectedCustomers(prev => {
@@ -473,6 +492,7 @@ export default function App() {
                 <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'texts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('texts')}><MessageSquare size={20}/> Тексты</button>
                 <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'broadcasts' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('broadcasts')}><Send size={20}/> Рассылка</button>
                 <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'stats' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('stats')}><BarChart size={20}/> Статистика</button>
+                <button className={`p-3 min-w-[80px] flex-1 flex flex-col items-center justify-center gap-1 text-xs font-semibold ${activeTab === 'security' ? 'border-b-2 border-tg-button text-tg-button' : 'text-tg-hint'}`} onClick={() => setActiveTab('security')}><Shield size={20}/> Защита</button>
             </div>
 
             <div className="px-4">
@@ -800,6 +820,91 @@ export default function App() {
                                 </div>
                             </>
                         )}
+                    </div>
+                )}
+                
+                {activeTab === 'security' && config && (
+                    <div className="flex flex-col gap-6 pb-6">
+                        {/* Настройки автоматического антиспама */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-bold text-tg-text flex items-center gap-2">
+                                    <Shield size={20} className="text-blue-500" /> Авто-Антиспам
+                                </h2>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={config.AntiSpam?.Enabled || false}
+                                        onChange={(e) => setConfig(prev => ({...prev, AntiSpam: {...prev.AntiSpam, Enabled: e.target.checked}}))}
+                                        className="w-4 h-4 rounded"
+                                    />
+                                    <span className="text-sm font-semibold">Включен</span>
+                                </label>
+                            </div>
+
+                            <div className={`flex flex-col gap-4 ${!config.AntiSpam?.Enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-tg-hint">Лимит (сообщений)</label>
+                                        <input type="number" value={config.AntiSpam?.MaxMessages || 5} onChange={e => setConfig(prev => ({...prev, AntiSpam: {...prev.AntiSpam, MaxMessages: Number(e.target.value)}}))} className="bg-tg-bg border border-tg-hint/30 rounded-xl p-2 outline-none w-full" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-tg-hint">За время (сек)</label>
+                                        <input type="number" value={config.AntiSpam?.WindowSeconds || 10} onChange={e => setConfig(prev => ({...prev, AntiSpam: {...prev.AntiSpam, WindowSeconds: Number(e.target.value)}}))} className="bg-tg-bg border border-tg-hint/30 rounded-xl p-2 outline-none w-full" />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs font-semibold text-tg-hint">Бан на (сек)</label>
+                                        <input type="number" value={config.AntiSpam?.BlockDuration || 60} onChange={e => setConfig(prev => ({...prev, AntiSpam: {...prev.AntiSpam, BlockDuration: Number(e.target.value)}}))} className="bg-tg-bg border border-tg-hint/30 rounded-xl p-2 outline-none w-full" />
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-sm font-semibold text-tg-hint">Текст предупреждения при авто-бане</label>
+                                    <textarea
+                                        value={config.Messages?.AntiSpamWarning || ''}
+                                        onChange={(e) => setConfig(prev => ({...prev, Messages: {...prev.Messages, AntiSpamWarning: e.target.value}}))}
+                                        placeholder="Вы отправляете сообщения слишком часто..."
+                                        className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl p-3 min-h-[60px] outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Черный список (Вечный бан) */}
+                        <div className="bg-tg-secondaryBg p-4 rounded-xl shadow-sm border border-tg-hint/20">
+                            <h2 className="text-xl font-bold mb-4 text-tg-text text-red-500">Черный список (Вечный бан)</h2>
+
+                            <div className="relative mb-3">
+                                <Search className="absolute left-3 top-2.5 text-tg-hint" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Поиск по имени или ID..."
+                                    value={searchQuery}
+                                    onChange={(e) => { setSearchQuery(e.target.value); fetchBroadcastData(e.target.value); }}
+                                    className="w-full bg-tg-bg border border-tg-hint/30 rounded-xl py-2 pl-10 pr-3 outline-none focus:border-tg-link"
+                                />
+                            </div>
+
+                            <div className="max-h-64 overflow-y-auto pr-1">
+                                {customers.length === 0 ? (
+                                    <div className="text-center text-tg-hint py-4 text-sm">Пользователи не найдены</div>
+                                ) : (
+                                    customers.map(c => (
+                                        <div key={c.customer_id} className={`flex items-center justify-between p-2 mb-2 rounded-lg border ${c.is_banned ? 'bg-red-500/10 border-red-500/30' : 'bg-tg-bg border-tg-hint/20'}`}>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="text-sm font-bold truncate">{c.full_name || `ID: ${c.customer_id}`}</span>
+                                                <span className="text-xs text-tg-hint font-mono">{c.customer_id}</span>
+                                            </div>
+                                            <button
+                                                onClick={() => handleToggleBan(c.customer_id, c.is_banned)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${c.is_banned ? 'bg-tg-button text-tg-buttonText' : 'bg-red-100 text-red-600 hover:bg-red-200'}`}
+                                            >
+                                                {c.is_banned ? 'Разбанить' : 'В бан'}
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

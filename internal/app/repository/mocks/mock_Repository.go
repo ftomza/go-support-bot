@@ -96,6 +96,72 @@ func (_c *MockRepository_CheckAndCompleteBroadcast_Call) RunAndReturn(run func(c
 	return _c
 }
 
+// CheckUserBanned provides a mock function for the type MockRepository
+func (_mock *MockRepository) CheckUserBanned(ctx context.Context, customerID int64) (bool, error) {
+	ret := _mock.Called(ctx, customerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckUserBanned")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
+		return returnFunc(ctx, customerID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
+		r0 = returnFunc(ctx, customerID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, customerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_CheckUserBanned_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUserBanned'
+type MockRepository_CheckUserBanned_Call struct {
+	*mock.Call
+}
+
+// CheckUserBanned is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+func (_e *MockRepository_Expecter) CheckUserBanned(ctx interface{}, customerID interface{}) *MockRepository_CheckUserBanned_Call {
+	return &MockRepository_CheckUserBanned_Call{Call: _e.mock.On("CheckUserBanned", ctx, customerID)}
+}
+
+func (_c *MockRepository_CheckUserBanned_Call) Run(run func(ctx context.Context, customerID int64)) *MockRepository_CheckUserBanned_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_CheckUserBanned_Call) Return(b bool, err error) *MockRepository_CheckUserBanned_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockRepository_CheckUserBanned_Call) RunAndReturn(run func(ctx context.Context, customerID int64) (bool, error)) *MockRepository_CheckUserBanned_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClearSession provides a mock function for the type MockRepository
 func (_mock *MockRepository) ClearSession(ctx context.Context, customerID int64) error {
 	ret := _mock.Called(ctx, customerID)
@@ -1081,16 +1147,16 @@ func (_c *MockRepository_MarkCustomerAsBlocked_Call) RunAndReturn(run func(ctx c
 }
 
 // ReplaceCategoriesTree provides a mock function for the type MockRepository
-func (_mock *MockRepository) ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error {
-	ret := _mock.Called(ctx, mainPrompt, messagesJSON, roots)
+func (_mock *MockRepository) ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, antiSpamJSON []byte, roots []*datastruct.CategoryNode) error {
+	ret := _mock.Called(ctx, mainPrompt, messagesJSON, antiSpamJSON, roots)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ReplaceCategoriesTree")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []byte, []*datastruct.CategoryNode) error); ok {
-		r0 = returnFunc(ctx, mainPrompt, messagesJSON, roots)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []byte, []byte, []*datastruct.CategoryNode) error); ok {
+		r0 = returnFunc(ctx, mainPrompt, messagesJSON, antiSpamJSON, roots)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -1106,12 +1172,13 @@ type MockRepository_ReplaceCategoriesTree_Call struct {
 //   - ctx context.Context
 //   - mainPrompt string
 //   - messagesJSON []byte
+//   - antiSpamJSON []byte
 //   - roots []*datastruct.CategoryNode
-func (_e *MockRepository_Expecter) ReplaceCategoriesTree(ctx interface{}, mainPrompt interface{}, messagesJSON interface{}, roots interface{}) *MockRepository_ReplaceCategoriesTree_Call {
-	return &MockRepository_ReplaceCategoriesTree_Call{Call: _e.mock.On("ReplaceCategoriesTree", ctx, mainPrompt, messagesJSON, roots)}
+func (_e *MockRepository_Expecter) ReplaceCategoriesTree(ctx interface{}, mainPrompt interface{}, messagesJSON interface{}, antiSpamJSON interface{}, roots interface{}) *MockRepository_ReplaceCategoriesTree_Call {
+	return &MockRepository_ReplaceCategoriesTree_Call{Call: _e.mock.On("ReplaceCategoriesTree", ctx, mainPrompt, messagesJSON, antiSpamJSON, roots)}
 }
 
-func (_c *MockRepository_ReplaceCategoriesTree_Call) Run(run func(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode)) *MockRepository_ReplaceCategoriesTree_Call {
+func (_c *MockRepository_ReplaceCategoriesTree_Call) Run(run func(ctx context.Context, mainPrompt string, messagesJSON []byte, antiSpamJSON []byte, roots []*datastruct.CategoryNode)) *MockRepository_ReplaceCategoriesTree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1125,15 +1192,20 @@ func (_c *MockRepository_ReplaceCategoriesTree_Call) Run(run func(ctx context.Co
 		if args[2] != nil {
 			arg2 = args[2].([]byte)
 		}
-		var arg3 []*datastruct.CategoryNode
+		var arg3 []byte
 		if args[3] != nil {
-			arg3 = args[3].([]*datastruct.CategoryNode)
+			arg3 = args[3].([]byte)
+		}
+		var arg4 []*datastruct.CategoryNode
+		if args[4] != nil {
+			arg4 = args[4].([]*datastruct.CategoryNode)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -1144,7 +1216,7 @@ func (_c *MockRepository_ReplaceCategoriesTree_Call) Return(err error) *MockRepo
 	return _c
 }
 
-func (_c *MockRepository_ReplaceCategoriesTree_Call) RunAndReturn(run func(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error) *MockRepository_ReplaceCategoriesTree_Call {
+func (_c *MockRepository_ReplaceCategoriesTree_Call) RunAndReturn(run func(ctx context.Context, mainPrompt string, messagesJSON []byte, antiSpamJSON []byte, roots []*datastruct.CategoryNode) error) *MockRepository_ReplaceCategoriesTree_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1541,6 +1613,69 @@ func (_c *MockRepository_SetTopicStatus_Call) Return(err error) *MockRepository_
 }
 
 func (_c *MockRepository_SetTopicStatus_Call) RunAndReturn(run func(ctx context.Context, topicID int, isClosed bool) error) *MockRepository_SetTopicStatus_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetUserBanned provides a mock function for the type MockRepository
+func (_mock *MockRepository) SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error {
+	ret := _mock.Called(ctx, customerID, isBanned)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserBanned")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, bool) error); ok {
+		r0 = returnFunc(ctx, customerID, isBanned)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SetUserBanned_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserBanned'
+type MockRepository_SetUserBanned_Call struct {
+	*mock.Call
+}
+
+// SetUserBanned is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - isBanned bool
+func (_e *MockRepository_Expecter) SetUserBanned(ctx interface{}, customerID interface{}, isBanned interface{}) *MockRepository_SetUserBanned_Call {
+	return &MockRepository_SetUserBanned_Call{Call: _e.mock.On("SetUserBanned", ctx, customerID, isBanned)}
+}
+
+func (_c *MockRepository_SetUserBanned_Call) Run(run func(ctx context.Context, customerID int64, isBanned bool)) *MockRepository_SetUserBanned_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SetUserBanned_Call) Return(err error) *MockRepository_SetUserBanned_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SetUserBanned_Call) RunAndReturn(run func(ctx context.Context, customerID int64, isBanned bool) error) *MockRepository_SetUserBanned_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -8,6 +8,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go-support-bot/internal/app/clients/llm"
@@ -19,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgraph-io/ristretto"
 	"github.com/jackc/pgx/v5"
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -36,6 +38,8 @@ type SupportService struct {
 	supportGroup int64
 	managerLang  string
 	developerIDs []int64
+
+	configCache *ristretto.Cache
 }
 
 func NewSupportService(
@@ -46,6 +50,14 @@ func NewSupportService(
 	groupID int64,
 	developerIDs []int64,
 ) *SupportService {
+	cache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1000,             // Количество ключей для отслеживания (нам хватит с головой)
+		MaxCost:     10 * 1024 * 1024, // Максимальный размер кэша: 10 MB
+		BufferItems: 64,               // Буфер для асинхронной записи
+	})
+	if err != nil {
+		panic("не удалось инициализировать ristretto cache: " + err.Error())
+	}
 	return &SupportService{
 		repo:         repo,
 		bot:          bot,
@@ -53,6 +65,7 @@ func NewSupportService(
 		llm:          llm,
 		managerLang:  langCode,
 		developerIDs: developerIDs,
+		configCache:  cache,
 	}
 }
 
@@ -510,4 +523,31 @@ func (s *SupportService) GetRatingKeyboard(topicID int) *telego.InlineKeyboardMa
 
 func (s *SupportService) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
 	return s.repo.SaveRating(ctx, customerID, topicID, score)
+}
+
+func (s *SupportService) CheckUserBanned(ctx context.Context, customerID int64) (bool, error) {
+	return s.repo.CheckUserBanned(ctx, customerID)
+}
+
+func (s *SupportService) SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error {
+	return s.repo.SetUserBanned(ctx, customerID, isBanned)
+}
+
+func (s *SupportService) GetAntiSpam(ctx context.Context) (AntiSpamConfig, error) {
+	res := AntiSpamConfig{}
+
+	settings, err := s.repo.GetSetting(ctx, "antispam")
+	if err != nil {
+		return res, fmt.Errorf("failed to get antispam settings: %v", err)
+	}
+
+	if settings == "" {
+		return GetDefaultAntiSpam(), nil
+	}
+
+	err = json.Unmarshal([]byte(settings), &res)
+	if err != nil {
+		return res, fmt.Errorf("failed to unmarshal antispam settings: %v", err)
+	}
+	return res, nil
 }

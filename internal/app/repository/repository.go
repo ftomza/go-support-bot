@@ -15,7 +15,7 @@ import (
 )
 
 type Repository interface {
-	ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error
+	ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, antiSpamJSON []byte, roots []*datastruct.CategoryNode) error
 	GetSetting(ctx context.Context, key string) (string, error)
 	GetMainPrompt(ctx context.Context) (string, error)
 	GetAllCategoriesFull(ctx context.Context) ([]datastruct.Category, error)
@@ -29,6 +29,8 @@ type Repository interface {
 	SetTopicStatus(ctx context.Context, topicID int, isClosed bool) error
 	UpdateCustomerLang(ctx context.Context, customerID int64, langCode string) error
 	UpdateActiveManager(ctx context.Context, topicID int, managerID int64) error
+	CheckUserBanned(ctx context.Context, customerID int64) (bool, error)
+	SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error
 
 	GetSession(ctx context.Context, customerID int64) (*datastruct.SessionData, error)
 	SetWaitingName(ctx context.Context, customerID int64) error

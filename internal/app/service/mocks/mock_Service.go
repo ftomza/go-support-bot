@@ -42,6 +42,72 @@ func (_m *MockService) EXPECT() *MockService_Expecter {
 	return &MockService_Expecter{mock: &_m.Mock}
 }
 
+// CheckUserBanned provides a mock function for the type MockService
+func (_mock *MockService) CheckUserBanned(ctx context.Context, customerID int64) (bool, error) {
+	ret := _mock.Called(ctx, customerID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckUserBanned")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) (bool, error)); ok {
+		return returnFunc(ctx, customerID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64) bool); ok {
+		r0 = returnFunc(ctx, customerID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = returnFunc(ctx, customerID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockService_CheckUserBanned_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckUserBanned'
+type MockService_CheckUserBanned_Call struct {
+	*mock.Call
+}
+
+// CheckUserBanned is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+func (_e *MockService_Expecter) CheckUserBanned(ctx interface{}, customerID interface{}) *MockService_CheckUserBanned_Call {
+	return &MockService_CheckUserBanned_Call{Call: _e.mock.On("CheckUserBanned", ctx, customerID)}
+}
+
+func (_c *MockService_CheckUserBanned_Call) Run(run func(ctx context.Context, customerID int64)) *MockService_CheckUserBanned_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_CheckUserBanned_Call) Return(b bool, err error) *MockService_CheckUserBanned_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockService_CheckUserBanned_Call) RunAndReturn(run func(ctx context.Context, customerID int64) (bool, error)) *MockService_CheckUserBanned_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ClearCacheBotClient provides a mock function for the type MockService
 func (_mock *MockService) ClearCacheBotClient() {
 	_mock.Called()
@@ -2065,6 +2131,69 @@ func (_c *MockService_SetCustomerLangByTopic_Call) Return(err error) *MockServic
 }
 
 func (_c *MockService_SetCustomerLangByTopic_Call) RunAndReturn(run func(ctx context.Context, topicID int, langCode string) error) *MockService_SetCustomerLangByTopic_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetUserBanned provides a mock function for the type MockService
+func (_mock *MockService) SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error {
+	ret := _mock.Called(ctx, customerID, isBanned)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetUserBanned")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, int64, bool) error); ok {
+		r0 = returnFunc(ctx, customerID, isBanned)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockService_SetUserBanned_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetUserBanned'
+type MockService_SetUserBanned_Call struct {
+	*mock.Call
+}
+
+// SetUserBanned is a helper method to define mock.On call
+//   - ctx context.Context
+//   - customerID int64
+//   - isBanned bool
+func (_e *MockService_Expecter) SetUserBanned(ctx interface{}, customerID interface{}, isBanned interface{}) *MockService_SetUserBanned_Call {
+	return &MockService_SetUserBanned_Call{Call: _e.mock.On("SetUserBanned", ctx, customerID, isBanned)}
+}
+
+func (_c *MockService_SetUserBanned_Call) Run(run func(ctx context.Context, customerID int64, isBanned bool)) *MockService_SetUserBanned_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 int64
+		if args[1] != nil {
+			arg1 = args[1].(int64)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockService_SetUserBanned_Call) Return(err error) *MockService_SetUserBanned_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockService_SetUserBanned_Call) RunAndReturn(run func(ctx context.Context, customerID int64, isBanned bool) error) *MockService_SetUserBanned_Call {
 	_c.Call.Return(run)
 	return _c
 }

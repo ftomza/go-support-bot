@@ -11,6 +11,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"go-support-bot/internal/app/middleware"
 	"log"
 	"net/http"
 	"os"
@@ -171,6 +172,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create bot handler: %v", err)
 	}
+
+	// Инициализируем middleware
+	antiSpam := middleware.NewAntiSpamMiddleware(svc, clientBot.Bot)
+
+	// Подключаем к роутеру
+	bh.Use(antiSpam.Handler())
 
 	// 5. Регистрируем наши эндпоинты в хендлере
 	eps.Register(bh)

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.10] - 2026-03-21
+
+### Added
+- **Anti-Spam Shield (Token Bucket)**: Introduced a robust rate-limiting middleware (`AntiSpamMiddleware`) to protect the bot from message flooding.
+- **Security Dashboard**: Added a new "Security" (Защита) tab in the Admin WebApp. Administrators can now dynamically configure auto-ban limits (messages per second, block duration) and customize the warning text.
+- **Permanent Ban System (Blacklist)**: Added an `is_banned` column to the `customers` database table (`20260321160000_add_banned_flag.sql`). Admins can now manually permanently ban or unban users directly from the WebApp interface.
+- **High-Performance Caching**: Integrated `dgraph-io/ristretto` for lightning-fast, thread-safe global configuration caching. This prevents database overload (N+1 query issues) during high-traffic spikes, as the bot no longer queries the DB on every incoming message.
+
+### Fixed
+- **Background Goroutine Context**: Fixed a bug where asynchronous warning messages failed to send due to HTTP context cancellation.
+- **HTML Parsing in Warnings**: Added `ParseMode: telego.ModeHTML` to anti-spam notifications and whitelisted the `AntiSpamWarning` key in the custom HTML Validator (`ValidateYamlConfig`) to prevent Telegram API crashes on invalid tags.
+- **Config Persistence**: Updated the `ReplaceCategoriesTree` repository method to correctly serialize and save the `antispam` JSON block into the `bot_settings` table, ensuring settings survive server restarts.
+
 ## [0.0.9] - 2026-03-17
 
 ### Added
