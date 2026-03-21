@@ -164,6 +164,7 @@ func TestSupportService_ExportConfig(t *testing.T) {
 		// Мокаем тексты
 		mockRepo.EXPECT().GetMainPrompt(ctx).Return("Главный вопрос", nil)
 		mockRepo.EXPECT().GetSetting(ctx, "messages").Return("", nil)
+		mockRepo.EXPECT().GetSetting(ctx, "antispam").Return("", nil)
 
 		parentID := 1
 		managerID := int64(999)
