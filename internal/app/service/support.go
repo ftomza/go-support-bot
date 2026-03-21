@@ -8,6 +8,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go-support-bot/internal/app/clients/llm"
@@ -510,4 +511,31 @@ func (s *SupportService) GetRatingKeyboard(topicID int) *telego.InlineKeyboardMa
 
 func (s *SupportService) SaveRating(ctx context.Context, customerID int64, topicID int, score int) error {
 	return s.repo.SaveRating(ctx, customerID, topicID, score)
+}
+
+func (s *SupportService) CheckUserBanned(ctx context.Context, customerID int64) (bool, error) {
+	return s.repo.CheckUserBanned(ctx, customerID)
+}
+
+func (s *SupportService) SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error {
+	return s.repo.SetUserBanned(ctx, customerID, isBanned)
+}
+
+func (s *SupportService) GetAntiSpam(ctx context.Context) (AntiSpamConfig, error) {
+	res := AntiSpamConfig{}
+
+	settings, err := s.repo.GetSetting(ctx, "antispam")
+	if err != nil {
+		return res, fmt.Errorf("failed to get antispam settings: %v", err)
+	}
+
+	if settings == "" {
+		return GetDefaultAntiSpam(), nil
+	}
+
+	err = json.Unmarshal([]byte(settings), &res)
+	if err != nil {
+		return res, fmt.Errorf("failed to unmarshal antispam settings: %v", err)
+	}
+	return res, nil
 }

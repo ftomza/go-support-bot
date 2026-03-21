@@ -13,14 +13,13 @@ import (
 )
 
 type YamlMessages struct {
-	WelcomeNewUser   string `yaml:"WelcomeNewUser" json:"WelcomeNewUser"`
-	AskForText       string `yaml:"AskForText" json:"AskForText"`
-	TopicCreated     string `yaml:"TopicCreated" json:"TopicCreated"`
-	OutOfHours       string `yaml:"OutOfHours" json:"OutOfHours"`
-	ServerError      string `yaml:"ServerError" json:"ServerError"`
-	CloseTopicButton string `yaml:"CloseTopicButton" json:"CloseTopicButton"`
-
-	// НОВЫЕ ПОЛЯ ДЛЯ КЛИЕНТОВ
+	//ПОЛЯ ДЛЯ КЛИЕНТОВ
+	WelcomeNewUser       string `yaml:"WelcomeNewUser" json:"WelcomeNewUser"`
+	AskForText           string `yaml:"AskForText" json:"AskForText"`
+	TopicCreated         string `yaml:"TopicCreated" json:"TopicCreated"`
+	OutOfHours           string `yaml:"OutOfHours" json:"OutOfHours"`
+	ServerError          string `yaml:"ServerError" json:"ServerError"`
+	CloseTopicButton     string `yaml:"CloseTopicButton" json:"CloseTopicButton"`
 	TopicClosedByManager string `yaml:"TopicClosedByManager" json:"TopicClosedByManager"`
 	TopicClosedByClient  string `yaml:"TopicClosedByClient" json:"TopicClosedByClient"`
 	TopicAlreadyClosed   string `yaml:"TopicAlreadyClosed" json:"TopicAlreadyClosed"`
@@ -32,8 +31,9 @@ type YamlMessages struct {
 	ButtonHome           string `yaml:"ButtonHome" json:"ButtonHome"`
 	RateService          string `yaml:"RateService" json:"RateService"`
 	RatingThanks         string `yaml:"RatingThanks" json:"RatingThanks"`
+	AntiSpamWarning      string `yaml:"AntiSpamWarning" json:"AntiSpamWarning"`
 
-	// НОВЫЕ ПОЛЯ ДЛЯ МЕНЕДЖЕРОВ
+	//ПОЛЯ ДЛЯ МЕНЕДЖЕРОВ
 	NotifyManagerNew         string `yaml:"NotifyManagerNew" json:"NotifyManagerNew"`
 	NotifyTopicCreated       string `yaml:"NotifyTopicCreated" json:"NotifyTopicCreated"`
 	NotifyTopicClosedClient  string `yaml:"NotifyTopicClosedClient" json:"NotifyTopicClosedClient"`
@@ -51,6 +51,7 @@ func GetDefaultMessages() YamlMessages {
 		CloseTopicButton: "❌ Завершить обращение",
 		RateService:      "Пожалуйста, оцените качество решения вашего вопроса:",
 		RatingThanks:     "Спасибо за вашу оценку! ⭐️",
+		AntiSpamWarning:  "⚠️ Вы отправляете сообщения слишком часто. Бот приостановил работу на 1 минуту для защиты от спама.",
 
 		TopicClosedByManager: "✅ Менеджер завершил диалог. Спасибо за обращение!",
 		TopicClosedByClient:  "✅ Диалог успешно завершен. Спасибо!",
@@ -70,14 +71,23 @@ func GetDefaultMessages() YamlMessages {
 	}
 }
 
+// AntiSpamConfig содержит настройки защиты от флуда
+type AntiSpamConfig struct {
+	Enabled       bool `json:"Enabled" yaml:"Enabled"`
+	MaxMessages   int  `json:"MaxMessages" yaml:"MaxMessages"`
+	WindowSeconds int  `json:"WindowSeconds" yaml:"WindowSeconds"`
+	BlockDuration int  `json:"BlockDuration" yaml:"BlockDuration"`
+}
+
 type YamlConfig struct {
 	Text     string               `yaml:"Text" json:"Text"`
 	Messages YamlMessages         `yaml:"Messages" json:"Messages"`
 	Themes   map[string]YamlTheme `yaml:"Themes" json:"Themes"`
+	AntiSpam AntiSpamConfig       `json:"AntiSpam" yaml:"AntiSpam"`
 }
 
 type YamlTheme struct {
-	Order     int                  `yaml:"Order" json:"Order"` // <--- ДОБАВЛЕНО
+	Order     int                  `yaml:"Order" json:"Order"`
 	Text      string               `yaml:"Text,omitempty" json:"Text,omitempty"`
 	Image     *string              `yaml:"Image,omitempty" json:"Image,omitempty"`
 	Manager   *int64               `yaml:"Manager,omitempty" json:"Manager,omitempty"`
@@ -86,13 +96,24 @@ type YamlTheme struct {
 	SubTheme  map[string]YamlTheme `yaml:"SubTheme,omitempty" json:"SubTheme,omitempty"`
 }
 
+func GetDefaultAntiSpam() AntiSpamConfig {
+	return AntiSpamConfig{
+		Enabled:       true,
+		MaxMessages:   5,
+		WindowSeconds: 10,
+		BlockDuration: 60,
+	}
+}
+
 func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) {
 	prompt, _ := s.repo.GetMainPrompt(ctx)
 	msgs, _ := s.GetMessages(ctx)
+	antiSpam, _ := s.GetAntiSpam(ctx)
 
 	cfg := &YamlConfig{
 		Text:     prompt,
 		Messages: msgs,
+		AntiSpam: antiSpam,
 		Themes:   make(map[string]YamlTheme),
 	}
 
@@ -139,6 +160,10 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 }
 
 func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) error {
+	if cfg.AntiSpam.MaxMessages == 0 {
+		cfg.AntiSpam = GetDefaultAntiSpam()
+	}
+
 	defaults := GetDefaultMessages()
 	if cfg.Messages.WelcomeNewUser == "" {
 		cfg.Messages.WelcomeNewUser = defaults.WelcomeNewUser
@@ -207,8 +232,16 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 	if cfg.Messages.NotifyTopicRecreated == "" {
 		cfg.Messages.NotifyTopicRecreated = defaults.NotifyTopicRecreated
 	}
+	if cfg.Messages.AntiSpamWarning == "" {
+		cfg.Messages.AntiSpamWarning = defaults.AntiSpamWarning
+	}
 
 	msgBytes, _ := json.Marshal(cfg.Messages)
+
+	antiSpamBytes, err := json.Marshal(cfg.AntiSpam)
+	if err != nil {
+		return fmt.Errorf("marshal antispam error: %w", err)
+	}
 
 	var buildNode func(name string, yt YamlTheme) *datastruct.CategoryNode
 	buildNode = func(name string, yt YamlTheme) *datastruct.CategoryNode {
@@ -241,7 +274,7 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 		return roots[i].Order < roots[j].Order
 	})
 
-	return s.repo.ReplaceCategoriesTree(ctx, cfg.Text, msgBytes, roots)
+	return s.repo.ReplaceCategoriesTree(ctx, cfg.Text, msgBytes, antiSpamBytes, roots)
 }
 
 func (s *SupportService) LoadCategoriesFromYAML(ctx context.Context, data []byte) error {
@@ -340,6 +373,9 @@ func (s *SupportService) GetMessages(ctx context.Context) (YamlMessages, error) 
 	}
 	if msgs.NotifyTopicRecreated == "" {
 		msgs.NotifyTopicRecreated = defaults.NotifyTopicRecreated
+	}
+	if msgs.AntiSpamWarning == "" {
+		msgs.AntiSpamWarning = defaults.AntiSpamWarning
 	}
 
 	return msgs, nil

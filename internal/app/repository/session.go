@@ -8,6 +8,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"go-support-bot/internal/app/datastruct"
 
@@ -70,5 +71,23 @@ func (r *SupportRepo) SaveCustomer(ctx context.Context, id int64, fullName strin
 		    updated_at = NOW()
 	`
 	_, err := r.db.Exec(ctx, query, id, fullName, username)
+	return err
+}
+
+// CheckUserBanned проверяем бан
+func (r *SupportRepo) CheckUserBanned(ctx context.Context, customerID int64) (bool, error) {
+	var isBanned bool
+	err := r.db.QueryRow(ctx, "SELECT is_banned FROM customers WHERE id = $1", customerID).Scan(&isBanned)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil // Если юзера нет в базе, значит он не забанен
+		}
+		return false, err
+	}
+	return isBanned, nil
+}
+
+func (r *SupportRepo) SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error {
+	_, err := r.db.Exec(ctx, "UPDATE customers SET is_banned = $1 WHERE id = $2", isBanned, customerID)
 	return err
 }

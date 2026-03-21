@@ -15,7 +15,7 @@ import (
 
 // GetCustomerProfiles возвращает список клиентов с возможностью поиска
 func (r *SupportRepo) GetCustomerProfiles(ctx context.Context, search string) ([]datastruct.CustomerProfile, error) {
-	query := "SELECT id, full_name, is_blocked FROM customers"
+	query := "SELECT id, full_name, is_blocked, is_banned FROM customers"
 	args := []any{}
 
 	if search != "" {
@@ -33,7 +33,7 @@ func (r *SupportRepo) GetCustomerProfiles(ctx context.Context, search string) ([
 	var profiles []datastruct.CustomerProfile
 	for rows.Next() {
 		var p datastruct.CustomerProfile
-		if err := rows.Scan(&p.CustomerID, &p.FullName, &p.IsBlocked); err != nil {
+		if err := rows.Scan(&p.CustomerID, &p.FullName, &p.IsBlocked, &p.IsBanned); err != nil {
 			return nil, err
 		}
 		profiles = append(profiles, p)

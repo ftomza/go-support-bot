@@ -287,6 +287,32 @@ func (api *APIEndpoints) Register(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "application/json")
 		return json.NewEncoder(w).Encode(stats)
 	})))
+
+	// Ручная блокировка/разблокировка пользователя
+	mux.HandleFunc("/api/customers/ban", api.wrap(api.auth(func(w http.ResponseWriter, r *http.Request) error {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+			return nil
+		}
+
+		var req struct {
+			CustomerID int64 `json:"customer_id"`
+			IsBanned   bool  `json:"is_banned"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return err
+		}
+
+		if err := api.svc.SetUserBanned(r.Context(), req.CustomerID, req.IsBanned); err != nil {
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return fmt.Errorf("SetUserBanned error: %w", err)
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"status":"ok"}`))
+		return nil
+	})))
 }
 
 // auth — это Middleware для проверки подлинности запроса от Telegram WebApp

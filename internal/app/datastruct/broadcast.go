@@ -37,6 +37,7 @@ type CustomerProfile struct {
 	CustomerID int64  `json:"customer_id"`
 	FullName   string `json:"full_name"`
 	IsBlocked  bool   `json:"is_blocked"`
+	IsBanned   bool   `json:"is_banned"`
 }
 
 // BroadcastTask используется воркером для получения данных из очереди

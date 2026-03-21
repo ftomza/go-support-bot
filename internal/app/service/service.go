@@ -48,6 +48,8 @@ type Service interface {
 	CloseTopicByClient(ctx context.Context, customerID int64) error
 	SetCustomerLangByTopic(ctx context.Context, topicID int, langCode string) error
 	SaveCustomer(ctx context.Context, customerID int64, fullName, username string) error
+	CheckUserBanned(ctx context.Context, customerID int64) (bool, error)
+	SetUserBanned(ctx context.Context, customerID int64, isBanned bool) error
 
 	GetRatingKeyboard(topicID int) *telego.InlineKeyboardMarkup
 	SaveRating(ctx context.Context, customerID int64, topicID int, score int) error

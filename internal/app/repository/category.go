@@ -12,22 +12,23 @@ import (
 )
 
 // ReplaceCategoriesTree теперь принимает и сохраняет JSON с сообщениями
-func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, roots []*datastruct.CategoryNode) error {
+func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt string, messagesJSON []byte, antiSpamJSON []byte, roots []*datastruct.CategoryNode) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	// МЯГКОЕ УДАЛЕНИЕ: помечаем все старые категории как неактивные вместо их физического удаления
+	// МЯГКОЕ УДАЛЕНИЕ: помечаем все старые категории как неактивные
 	if _, err = tx.Exec(ctx, "UPDATE categories SET is_active = false"); err != nil {
 		return err
 	}
 
-	// Сохраняем главный текст и переводы (сообщения)
 	_, err = tx.Exec(ctx, `
-		INSERT INTO bot_settings (key, value) VALUES ('main_prompt', $1), ('messages', $2)
-		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, mainPrompt, string(messagesJSON))
+       INSERT INTO bot_settings (key, value) 
+       VALUES ('main_prompt', $1), ('messages', $2), ('antispam', $3)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+		mainPrompt, string(messagesJSON), string(antiSpamJSON))
 	if err != nil {
 		return err
 	}
@@ -35,10 +36,9 @@ func (r *SupportRepo) ReplaceCategoriesTree(ctx context.Context, mainPrompt stri
 	var insertNode func(parentID *int, node *datastruct.CategoryNode) error
 	insertNode = func(parentID *int, node *datastruct.CategoryNode) error {
 		var id int
-		// Флаг is_active по умолчанию станет TRUE благодаря БД
 		err := tx.QueryRow(ctx, `
-			INSERT INTO categories (parent_id, name, prompt_text, manager_id, work_hours, timezone, image) 
-			VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+          INSERT INTO categories (parent_id, name, prompt_text, manager_id, work_hours, timezone, image) 
+          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
 			parentID, node.Name, node.PromptText, node.ManagerID, node.WorkHours, node.Timezone, node.Image).Scan(&id)
 		if err != nil {
 			return err
