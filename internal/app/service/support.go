@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgraph-io/ristretto"
 	"github.com/jackc/pgx/v5"
 	"github.com/mymmrac/telego"
 	th "github.com/mymmrac/telego/telegohandler"
@@ -37,6 +38,8 @@ type SupportService struct {
 	supportGroup int64
 	managerLang  string
 	developerIDs []int64
+
+	configCache *ristretto.Cache
 }
 
 func NewSupportService(
@@ -47,6 +50,14 @@ func NewSupportService(
 	groupID int64,
 	developerIDs []int64,
 ) *SupportService {
+	cache, err := ristretto.NewCache(&ristretto.Config{
+		NumCounters: 1000,             // Количество ключей для отслеживания (нам хватит с головой)
+		MaxCost:     10 * 1024 * 1024, // Максимальный размер кэша: 10 MB
+		BufferItems: 64,               // Буфер для асинхронной записи
+	})
+	if err != nil {
+		panic("не удалось инициализировать ristretto cache: " + err.Error())
+	}
 	return &SupportService{
 		repo:         repo,
 		bot:          bot,
@@ -54,6 +65,7 @@ func NewSupportService(
 		llm:          llm,
 		managerLang:  langCode,
 		developerIDs: developerIDs,
+		configCache:  cache,
 	}
 }
 

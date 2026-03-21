@@ -128,7 +128,7 @@ func (m *AntiSpamMiddleware) Handler() th.Handler {
 
 			// Пытаемся отправить сообщение асинхронно, чтобы не блокировать текущую горутину
 			go func(cID int64, text string) {
-				_, err := m.bot.SendMessage(ctx, &telego.SendMessageParams{
+				_, err := m.bot.SendMessage(context.Background(), &telego.SendMessageParams{
 					ChatID: telego.ChatID{ID: cID},
 					Text:   text,
 				})

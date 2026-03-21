@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"go-support-bot/internal/app/datastruct"
 
@@ -106,6 +107,12 @@ func GetDefaultAntiSpam() AntiSpamConfig {
 }
 
 func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) {
+	if val, found := s.configCache.Get("global_config"); found {
+		if cfg, ok := val.(*YamlConfig); ok {
+			return cfg, nil
+		}
+	}
+
 	prompt, _ := s.repo.GetMainPrompt(ctx)
 	msgs, _ := s.GetMessages(ctx)
 	antiSpam, _ := s.GetAntiSpam(ctx)
@@ -155,6 +162,8 @@ func (s *SupportService) ExportConfig(ctx context.Context) (*YamlConfig, error) 
 	for i, r := range roots {
 		cfg.Themes[r.Name] = buildTheme(r, i)
 	}
+
+	s.configCache.SetWithTTL("global_config", cfg, 1, 1*time.Hour)
 
 	return cfg, nil
 }
@@ -273,6 +282,8 @@ func (s *SupportService) ImportConfig(ctx context.Context, cfg *YamlConfig) erro
 	sort.Slice(roots, func(i, j int) bool {
 		return roots[i].Order < roots[j].Order
 	})
+
+	s.configCache.Del("global_config")
 
 	return s.repo.ReplaceCategoriesTree(ctx, cfg.Text, msgBytes, antiSpamBytes, roots)
 }

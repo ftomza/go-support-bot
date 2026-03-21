@@ -95,6 +95,7 @@ func ValidateYamlConfig(cfg *YamlConfig) error {
 		"NotifyTopicClosedManager": cfg.Messages.NotifyTopicClosedManager,
 		"NotifyTopicRecreated":     cfg.Messages.NotifyTopicRecreated,
 		"ServerError":              cfg.Messages.ServerError,
+		"AntiSpamWarning":          cfg.Messages.AntiSpamWarning,
 	}
 
 	for key, text := range msgs {
