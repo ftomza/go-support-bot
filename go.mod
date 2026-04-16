@@ -6,7 +6,7 @@ require (
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/google/generative-ai-go v0.20.1
 	github.com/ilyakaznacheev/cleanenv v1.5.0
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.0
 	github.com/mymmrac/telego v1.7.0
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/stretchr/testify v1.11.1
